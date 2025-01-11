@@ -78,7 +78,7 @@ class SignalCalculator {
       const message = formatSignals(signals);
       console.log('Formatted message:', message);
       await this.notificationService.sendToLine(message);
-      // await this.notificationService.sendToTelegram(message);
+      await this.notificationService.sendToTelegram(message);
     } else {
       console.log('No signals found');
     }
