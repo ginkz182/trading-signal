@@ -4,10 +4,12 @@ const dayjs = require('dayjs');
 const config = require('./config')
 const technicalindicators = require('technicalindicators');
 
+require('dotenv').config();
+
 class SignalCalculator {
   constructor(config = {}) {
     this.exchange = new ccxt.binance();
-    this.lineToken = config.lineToken;
+    this.lineToken = process.env.lineToken;
     this.symbols = config.symbols || [];
     this.timeframe = config.timeframe || '1d';
   }
@@ -136,7 +138,7 @@ scanner.scan();
 // Or schedule to run daily
 const schedule = require('node-schedule');
 // Run at specific time (e.g., 23:55 every day)
-schedule.scheduleJob('55 6 * * *', () => {
+schedule.scheduleJob('55 23 * * *', () => {
   scanner.scan();
 });
 

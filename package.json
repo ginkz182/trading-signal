@@ -3,6 +3,7 @@
     "axios": "^1.7.9",
     "ccxt": "^4.4.47",
     "dayjs": "^1.11.13",
+    "dotenv": "^16.4.7",
     "node-schedule": "^2.1.1",
     "technicalindicators": "^3.1.0"
   },

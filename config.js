@@ -1,6 +1,4 @@
-// Example usage
 const config = {
-  lineToken: 'tUWobWEY4zuTaj0BgaVqfND1DBqxjKNBdJacug3UeAQ',
   symbols: [
     'ADA/USDT',
     'AVAX/USDT',
