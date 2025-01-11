@@ -29,7 +29,24 @@ const config = {
     'UNI/USDT',
     'WIN/USDT',
     'ZIL/USDT',
-    'XTZ/USDT'
+    'XTZ/USDT',
+  ],
+  stockSymbols: [
+    'AAPL',
+    'ABNB',
+    'AMZN',
+    'BKNG',
+    'COST',
+    'GOOG',
+    'GOVX',
+    'LLY',
+    'LULU',
+    'META',
+    'MSFT',
+    'NVDA',
+    'NVO',
+    'PYPL',
+    'TSLA',
   ],
   timeframe: '1d'
 };
