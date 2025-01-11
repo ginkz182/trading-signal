@@ -8,7 +8,10 @@ require('dotenv').config();
 
 class SignalCalculator {
   constructor(config = {}) {
-    this.exchange = new ccxt.binance();
+    this.exchange = new ccxt.binance({
+      apiKey: process.env.BINANCE_API_KEY,
+      secret: process.env.BINANCE_SECRET_KEY,
+    });
     this.lineToken = process.env.lineToken;
     this.symbols = config.symbols || [];
     this.timeframe = config.timeframe || '1d';
