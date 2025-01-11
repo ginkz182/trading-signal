@@ -1,0 +1,39 @@
+// Example usage
+const config = {
+  lineToken: 'tUWobWEY4zuTaj0BgaVqfND1DBqxjKNBdJacug3UeAQ',
+  symbols: [
+    'ADA/USDT',
+    'AVAX/USDT',
+    'AXS/USDT',
+    'BAND/USDT',
+    'BNB/USDT',
+    'BTC/USDT',
+    'CAKE/USDT',
+    'CELR/USDT',
+    'CHR/USDT',
+    'COTI/USDT',
+    'DOT/USDT',
+    'EGLD/USDT',
+    'ENJ/USDT',
+    'ETH/USDT',
+    'FTM/USDT',
+    'IOST/USDT',
+    'LINK/USDT',
+    'MANA/USDT',
+    'MATIC/USDT',
+    'NEAR/USDT',
+    'ONE/USDT',
+    'ROSE/USDT',
+    'SAND/USDT',
+    'SHIB/USDT',
+    'SOL/USDT',
+    'THETA/USDT',
+    'UNI/USDT',
+    'WIN/USDT',
+    'ZIL/USDT',
+    'XTZ/USDT'
+  ],
+  timeframe: '1d'
+};
+
+module.exports = config;
