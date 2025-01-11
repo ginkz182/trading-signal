@@ -138,11 +138,11 @@ const scanner = new SignalCalculator(config);
 // Run once
 scanner.scan();
 
-// Or schedule to run daily
-const schedule = require('node-schedule');
-// Run at specific time (e.g., 23:55 every day)
-schedule.scheduleJob('55 23 * * *', () => {
-  scanner.scan();
-});
+// // Or schedule to run daily
+// const schedule = require('node-schedule');
+// // Run at specific time (e.g., 23:55 every day)
+// schedule.scheduleJob('55 23 * * *', () => {
+//   scanner.scan();
+// });
 
 module.exports = SignalCalculator;
