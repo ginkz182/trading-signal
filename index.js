@@ -6,9 +6,9 @@ const config = require('./src/config');
 const scanner = new SignalCalculator(config);
 
 // Run once
-// scanner.scan();
+scanner.scan();
 
-// Schedule daily run
-schedule.scheduleJob('55 23 * * *', () => {
-  scanner.scan();
-});
+// // Schedule daily run
+// schedule.scheduleJob('55 23 * * *', () => {
+//   scanner.scan();
+// });
