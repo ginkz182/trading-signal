@@ -1,4 +1,5 @@
 const BinanceService = require('./services/binance.service');
+const KuCoinService = require('./services/kucoin.service');
 const YahooFinanceService = require('./services/yahoo.service');
 const NotificationService = require('./services/notification.service');
 const TechnicalService = require('./services/technical.service');
@@ -7,6 +8,7 @@ const { formatSignals } = require('./utils/formatters');
 class SignalCalculator {
   constructor(config = {}) {
     this.binanceService = new BinanceService(config.timeframe);
+    this.kucoinService = new KuCoinService(config.timeframe);
     this.yahooService = new YahooFinanceService(config.timeframe);
     this.notificationService = new NotificationService({
       lineToken: process.env.lineToken,
@@ -28,7 +30,8 @@ class SignalCalculator {
     // Process crypto symbols
     for (const symbol of this.symbols) {
       try {
-        const prices = await this.binanceService.getPrices(symbol);
+        const prices = await this.kucoinService.getPrices(symbol);
+        // console.log("PRICES = " + JSON.stringify(prices));
         if (!prices || prices.length < 27) continue;
 
         const macdValues = this.technicalService.calculateMACD(prices);

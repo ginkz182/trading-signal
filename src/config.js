@@ -18,7 +18,7 @@ const config = {
     'IOST/USDT',
     'LINK/USDT',
     'MANA/USDT',
-    'MATIC/USDT',
+    'POL/USDT',
     'NEAR/USDT',
     'ONE/USDT',
     'ROSE/USDT',
