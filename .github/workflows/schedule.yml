@@ -27,4 +27,4 @@ jobs:
 
       # Step 4: Run your script
       - name: Run the script
-        run: node signal.js
+        run: node index.js
