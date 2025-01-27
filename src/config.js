@@ -14,7 +14,7 @@ const config = {
     'EGLD/USDT',
     'ENJ/USDT',
     'ETH/USDT',
-    'FTM/USDT',
+    'S/USDT',
     'IOST/USDT',
     'LINK/USDT',
     'MANA/USDT',
