@@ -47,6 +47,7 @@ const config = {
     'NVO',
     'PYPL',
     'TSLA',
+    'PLTR',
   ],
   timeframe: '1d'
 };
