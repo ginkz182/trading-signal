@@ -2,8 +2,8 @@ name: Signal Screener
 
 on:
   schedule:
-    # Schedule to run daily at 6:50 GMT+7
-    - cron: '50 23 * * *' # UTC
+    # Schedule to run daily at 7:01 GMT+7
+    - cron: "1 0 * * *" # UTC
   workflow_dispatch:
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 'latest' # Use the version you need
+          node-version: "latest" # Use the version you need
 
       # Step 3: Install dependencies (if any)
       - name: Install dependencies
