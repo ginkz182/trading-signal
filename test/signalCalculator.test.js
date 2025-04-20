@@ -12,35 +12,32 @@ describe("SignalCalculator", () => {
   let mockIndicatorManager;
   let mockExchangeFactory;
 
-  // Sample price data that would generate specific MACD signals
-  const buySignalPrices = [
-    100, 102, 104, 104, 105, 107, 108, 109, 110, 112, 115, 118, 120, 123, 125,
-    128, 130, 132, 135, 137, 136, 135, 133, 131, 128, 125, 122, 119, 115, 112,
-  ];
-
-  const sellSignalPrices = [
-    140, 138, 136, 134, 132, 130, 128, 126, 124, 122, 120, 118, 116, 114, 112,
-    110, 108, 106, 104, 102, 100, 98, 96, 94, 92, 90, 88, 86, 84, 82,
-  ];
+  // Sample price data with 30 data points
+  const upTrendPrices = Array(30)
+    .fill(0)
+    .map((_, i) => 100 + i);
+  const downTrendPrices = Array(30)
+    .fill(0)
+    .map((_, i) => 130 - i);
 
   beforeEach(() => {
     // Initialize mock services
     mockKuCoinService = {
-      getPrices: sinon.stub().resolves(buySignalPrices),
+      getPrices: sinon.stub().resolves(upTrendPrices),
     };
 
     mockYahooService = {
-      getPrices: sinon.stub().resolves(sellSignalPrices),
+      getPrices: sinon.stub().resolves(downTrendPrices),
     };
 
     mockNotificationService = {
-      sendToLine: sinon.stub().resolves(),
       sendToTelegram: sinon.stub().resolves(),
     };
 
     // Set default value for analyzePrice to avoid undefined errors during tests
     mockIndicatorManager = {
-      analyzePrice: sinon.stub().returns({ signal: "HOLD", macd: 0 }),
+      analyzePrice: sinon.stub().returns({ signal: "HOLD" }),
+      resetZones: sinon.stub(),
     };
 
     // Mock exchange factory
@@ -72,106 +69,159 @@ describe("SignalCalculator", () => {
     sinon.restore();
   });
 
-  describe("checkSignals()", () => {
-    it("should process crypto signals correctly for BUY signal", async () => {
-      // Setup indicator manager mock to return BUY signals
+  describe("_processTradingPair()", () => {
+    it("should process cryptocurrency pair and return BUY signal data", async () => {
+      // Setup indicator manager mock to return BUY signal
       mockIndicatorManager.analyzePrice.returns({
         signal: "BUY",
-        macd: 0.5,
+        fastEMA: 110,
+        slowEMA: 105,
+        isBull: true,
+        isBear: false,
+        details: { emaCrossover: { fastEMA: 110, slowEMA: 105 } },
       });
 
-      const signals = await calculator.checkSignals();
+      const signalData = await calculator._processTradingPair(
+        "BTC/USDT",
+        "crypto"
+      );
 
       expect(mockKuCoinService.getPrices.calledWith("BTC/USDT")).to.be.true;
-      expect(mockKuCoinService.getPrices.calledWith("ETH/USDT")).to.be.true;
-      expect(signals.crypto["BTC/USDT"].signal).to.equal("BUY");
-      expect(signals.crypto["BTC/USDT"].price).to.equal(
-        buySignalPrices[buySignalPrices.length - 1]
+      expect(signalData).to.not.be.null;
+      expect(signalData.signal).to.equal("BUY");
+      expect(signalData.price).to.equal(
+        upTrendPrices[upTrendPrices.length - 1]
       );
+      expect(signalData.previousDayPrice).to.equal(
+        upTrendPrices[upTrendPrices.length - 2]
+      );
+      expect(signalData.fastEMA).to.equal(110);
+      expect(signalData.slowEMA).to.equal(105);
+      expect(signalData.isBull).to.be.true;
     });
 
-    it("should use previous day data when option is enabled", async () => {
-      // Setup indicator manager mock to return BUY signals
-      mockIndicatorManager.analyzePrice.returns({
-        signal: "BUY",
-        macd: 0.5,
-      });
-
-      const signals = await calculator.checkSignals({ usePreviousDay: true });
-
-      // Verify that analyzePrice was called with previous day data (one less item)
-      const analysisCall = mockIndicatorManager.analyzePrice.firstCall;
-      expect(analysisCall.args[0].length).to.be.lessThan(
-        buySignalPrices.length
-      );
-
-      // Verify signal still includes current price
-      expect(signals.crypto["BTC/USDT"].price).to.equal(
-        buySignalPrices[buySignalPrices.length - 1]
-      );
-
-      // Verify previous day price is included
-      expect(signals.crypto["BTC/USDT"].previousDayPrice).to.equal(
-        buySignalPrices[buySignalPrices.length - 2]
-      );
-
-      // Verify flag is set correctly
-      expect(signals.crypto["BTC/USDT"].usingPreviousDayData).to.be.true;
-    });
-
-    it("should process stock signals correctly for SELL signal", async () => {
-      // Setup indicator manager mock to return SELL signals
+    it("should process stock pair and return SELL signal data", async () => {
+      // Setup indicator manager mock to return SELL signal
       mockIndicatorManager.analyzePrice.returns({
         signal: "SELL",
-        macd: -0.5,
+        fastEMA: 95,
+        slowEMA: 100,
+        isBull: false,
+        isBear: true,
+        details: { emaCrossover: { fastEMA: 95, slowEMA: 100 } },
       });
 
-      const signals = await calculator.checkSignals();
+      const signalData = await calculator._processTradingPair("AAPL", "stocks");
 
       expect(mockYahooService.getPrices.calledWith("AAPL")).to.be.true;
-      expect(mockYahooService.getPrices.calledWith("GOOGL")).to.be.true;
-      expect(signals.stocks["AAPL"].signal).to.equal("SELL");
-      expect(signals.stocks["AAPL"].price).to.equal(
-        sellSignalPrices[sellSignalPrices.length - 1]
+      expect(signalData).to.not.be.null;
+      expect(signalData.signal).to.equal("SELL");
+      expect(signalData.price).to.equal(
+        downTrendPrices[downTrendPrices.length - 1]
       );
+      expect(signalData.previousDayPrice).to.equal(
+        downTrendPrices[downTrendPrices.length - 2]
+      );
+      expect(signalData.fastEMA).to.equal(95);
+      expect(signalData.slowEMA).to.equal(100);
+      expect(signalData.isBear).to.be.true;
     });
 
-    it("should skip HOLD signals", async () => {
+    it("should return null for HOLD signals", async () => {
       // Setup indicator manager mock to return HOLD signals
       mockIndicatorManager.analyzePrice.returns({
         signal: "HOLD",
-        macd: 0.1,
+        fastEMA: 105,
+        slowEMA: 100,
       });
 
-      const signals = await calculator.checkSignals();
+      const signalData = await calculator._processTradingPair(
+        "BTC/USDT",
+        "crypto"
+      );
 
-      expect(signals.crypto).to.be.empty;
-      expect(signals.stocks).to.be.empty;
+      expect(signalData).to.be.null;
     });
 
     it("should handle insufficient price data", async () => {
       mockKuCoinService.getPrices.resolves([100, 101]); // Less than required data
 
-      const signals = await calculator.checkSignals();
+      const signalData = await calculator._processTradingPair(
+        "BTC/USDT",
+        "crypto"
+      );
 
-      expect(signals.crypto).to.be.empty;
+      expect(signalData).to.be.null;
     });
 
     it("should handle API errors gracefully", async () => {
       mockKuCoinService.getPrices.rejects(new Error("API Error"));
 
+      const signalData = await calculator._processTradingPair(
+        "BTC/USDT",
+        "crypto"
+      );
+
+      expect(signalData).to.be.null;
+    });
+  });
+
+  describe("checkSignals()", () => {
+    it("should process all configured trading pairs", async () => {
+      // Set up BUY signals for the first crypto and first stock, HOLD for the rest
+      mockIndicatorManager.analyzePrice
+        .onFirstCall()
+        .returns({
+          signal: "BUY",
+          fastEMA: 110,
+          slowEMA: 105,
+          isBull: true,
+          isBear: false,
+        })
+        .onSecondCall()
+        .returns({ signal: "HOLD" })
+        .onThirdCall()
+        .returns({
+          signal: "SELL",
+          fastEMA: 95,
+          slowEMA: 100,
+          isBull: false,
+          isBear: true,
+        })
+        .onCall(3)
+        .returns({ signal: "HOLD" });
+
       const signals = await calculator.checkSignals();
 
-      expect(signals.crypto).to.be.empty;
+      // Should have 1 crypto and 1 stock signal
+      expect(Object.keys(signals.crypto)).to.have.lengthOf(1);
+      expect(Object.keys(signals.stocks)).to.have.lengthOf(1);
+      expect(signals.crypto).to.have.property("BTC/USDT");
+      expect(signals.crypto["BTC/USDT"].signal).to.equal("BUY");
+      expect(signals.stocks).to.have.property("AAPL");
+      expect(signals.stocks["AAPL"].signal).to.equal("SELL");
+    });
+
+    it("should ignore HOLD signals", async () => {
+      // Set up all HOLD signals
+      mockIndicatorManager.analyzePrice.returns({ signal: "HOLD" });
+
+      const signals = await calculator.checkSignals();
+
+      expect(Object.keys(signals.crypto)).to.have.lengthOf(0);
+      expect(Object.keys(signals.stocks)).to.have.lengthOf(0);
     });
   });
 
   describe("scan()", () => {
-    it("should send notifications when signals are found", async () => {
-      // Setup indicator manager mock to return BUY signals
+    it("should send notification when signals are found", async () => {
+      // Setup indicator manager mock to return BUY signals for all pairs
       mockIndicatorManager.analyzePrice.returns({
         signal: "BUY",
-        macd: 0.5,
+        fastEMA: 110,
+        slowEMA: 105,
+        isBull: true,
+        isBear: false,
       });
 
       await calculator.scan();
@@ -184,16 +234,25 @@ describe("SignalCalculator", () => {
       expect(telegramMessage).to.include("BUY");
     });
 
-    it("should not send notifications when no signals are found", async () => {
+    it("should not send notification when no signals are found", async () => {
       // Setup indicator manager mock to return HOLD signals
-      mockIndicatorManager.analyzePrice.returns({
-        signal: "HOLD",
-        macd: 0.1,
-      });
+      mockIndicatorManager.analyzePrice.returns({ signal: "HOLD" });
 
       await calculator.scan();
 
-      expect(mockNotificationService.sendToLine.called).to.be.false;
+      expect(mockNotificationService.sendToTelegram.called).to.be.false;
+    });
+
+    it("should skip notification when sendNotification is false", async () => {
+      // Setup indicator manager mock to return BUY signals
+      mockIndicatorManager.analyzePrice.returns({
+        signal: "BUY",
+        fastEMA: 110,
+        slowEMA: 105,
+      });
+
+      await calculator.scan({ sendNotification: false });
+
       expect(mockNotificationService.sendToTelegram.called).to.be.false;
     });
 
@@ -201,13 +260,15 @@ describe("SignalCalculator", () => {
       // Setup indicator manager mock to return BUY signals
       mockIndicatorManager.analyzePrice.returns({
         signal: "BUY",
-        macd: 0.5,
+        fastEMA: 110,
+        slowEMA: 105,
       });
 
       mockNotificationService.sendToTelegram.rejects(
         new Error("Notification Error")
       );
 
+      // This should throw an error when notification fails
       try {
         await calculator.scan();
         // If we get here, the test should fail
@@ -215,36 +276,6 @@ describe("SignalCalculator", () => {
       } catch (error) {
         expect(error.message).to.equal("Notification Error");
       }
-    });
-
-    it("should process multiple symbols and combine signals", async () => {
-      // Set up different signals for different symbols
-      mockIndicatorManager.analyzePrice
-        .onFirstCall()
-        .returns({ signal: "BUY", macd: 0.5 }) // BTC-USDT
-        .onSecondCall()
-        .returns({ signal: "SELL", macd: -0.5 }) // ETH-USDT
-        .onThirdCall()
-        .returns({ signal: "HOLD", macd: 0.1 }) // AAPL
-        .onCall(3)
-        .returns({ signal: "BUY", macd: 0.6 }); // GOOGL
-
-      const signals = await calculator.checkSignals();
-
-      // Check crypto signals
-      expect(signals.crypto).to.have.property("BTC/USDT");
-      expect(signals.crypto["BTC/USDT"].signal).to.equal("BUY");
-      expect(signals.crypto).to.have.property("ETH/USDT");
-      expect(signals.crypto["ETH/USDT"].signal).to.equal("SELL");
-
-      // Check stock signals
-      // AAPL should not be in results because it's HOLD
-      expect(signals.stocks).to.not.have.property("AAPL");
-      expect(signals.stocks).to.have.property("GOOGL");
-      expect(signals.stocks["GOOGL"].signal).to.equal("BUY");
-      expect(
-        Object.keys(signals.crypto).length + Object.keys(signals.stocks).length
-      ).to.be.greaterThan(0);
     });
   });
 });

@@ -13,144 +13,172 @@ describe("TechnicalService", () => {
     sinon.restore();
   });
 
-  describe("calculateMACD()", () => {
-    it("should calculate MACD values for sufficient data", () => {
-      // Generate sample price data - uptrend then downtrend
-      const prices = [];
-      for (let i = 0; i < 40; i++) {
-        if (i < 20) {
-          prices.push(100 + i); // Uptrend
-        } else {
-          prices.push(120 - (i - 20)); // Downtrend
-        }
-      }
-
-      const macdResult = technicalService.calculateMACD(prices);
-
-      // Basic validation
-      expect(macdResult).to.be.an("array");
-      expect(macdResult.length).to.be.greaterThan(0);
-
-      // Check structure of MACD result
-      const lastMacd = macdResult[macdResult.length - 1];
-      expect(lastMacd).to.have.property("MACD");
-      expect(lastMacd).to.have.property("signal");
-      expect(lastMacd).to.have.property("histogram");
-
-      // Check trend direction - after downtrend, MACD should be negative
-      expect(lastMacd.MACD).to.be.lessThan(0);
-    });
-
-    it("should handle insufficient data gracefully", () => {
-      // Create very small price array
-      const prices = [100, 101, 102];
-
-      // Should not throw an error
-      expect(() => {
-        const result = technicalService.calculateMACD(prices);
-
-        if (result) {
-          expect(result).to.be.an("array");
-        }
-      }).to.not.throw();
-    });
-
-    it("should handle linear uptrend correctly", () => {
-      // Generate linearly increasing prices
+  describe("calculateEMA()", () => {
+    it("should calculate EMA values for sufficient data", () => {
+      // Generate sample price data - uptrend
       const prices = [];
       for (let i = 0; i < 40; i++) {
         prices.push(100 + i);
       }
 
-      const macdResult = technicalService.calculateMACD(prices);
-      const lastMacd = macdResult[macdResult.length - 1];
+      const emaResult = technicalService.calculateEMA(prices, 12);
 
-      // In a linear uptrend, MACD should be positive
-      expect(lastMacd.MACD).to.be.greaterThan(0);
+      // Basic validation
+      expect(emaResult).to.be.an("array");
+      expect(emaResult.length).to.be.greaterThan(0);
+
+      // Check first EMA value (should be SMA of first 12 values)
+      const expectedFirstEMA =
+        prices.slice(0, 12).reduce((sum, price) => sum + price, 0) / 12;
+      expect(emaResult[0]).to.be.closeTo(expectedFirstEMA, 0.0001);
+
+      // Check that EMA follows the trend direction
+      expect(emaResult[emaResult.length - 1]).to.be.greaterThan(emaResult[0]);
     });
 
-    it("should handle linear downtrend correctly", () => {
-      // Generate linearly decreasing prices
-      const prices = [];
-      for (let i = 0; i < 40; i++) {
-        prices.push(140 - i);
-      }
+    it("should handle insufficient data gracefully", () => {
+      // Create very small price array
+      const prices = [100, 101, 102];
+      const period = 12;
 
-      const macdResult = technicalService.calculateMACD(prices);
-      const lastMacd = macdResult[macdResult.length - 1];
+      // Should not throw an error
+      const result = technicalService.calculateEMA(prices, period);
+      // With insufficient data, we should get an empty array
+      expect(result).to.be.an("array");
+      expect(result.length).to.equal(0);
+    });
 
-      // In a linear downtrend, MACD should be negative
-      expect(lastMacd.MACD).to.be.lessThan(0);
+    it("should handle exact minimum data required", () => {
+      // Create price array with exactly the required period length
+      const prices = [
+        100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111,
+      ];
+      const period = 12;
+
+      const result = technicalService.calculateEMA(prices, period);
+
+      expect(result).to.be.an("array");
+      expect(result.length).to.equal(1);
+      expect(result[0]).to.equal(
+        prices.reduce((sum, price) => sum + price, 0) / period
+      );
     });
   });
 
-  describe("checkZeroCross()", () => {
-    it("should detect BUY signal when MACD crosses above zero", () => {
-      const macdValues = [
-        { MACD: -1.5 },
-        { MACD: -0.5 },
-        { MACD: 0.5 }, // Crosses above zero here
-      ];
+  describe("checkEmaCrossover()", () => {
+    it("should detect BUY signal when fast EMA crosses above slow EMA", () => {
+      const fastEMA = [10, 11, 12]; // Rising fast EMA
+      const slowEMA = [12, 11.5, 11]; // Falling slow EMA
 
-      const signal = technicalService.checkZeroCross(macdValues);
+      // Previous: fastEMA < slowEMA, Current: fastEMA > slowEMA
+      const signal = technicalService.checkEmaCrossover(fastEMA, slowEMA);
 
       expect(signal).to.equal("BUY");
     });
 
-    it("should detect SELL signal when MACD crosses below zero", () => {
-      const macdValues = [
-        { MACD: 1.5 },
-        { MACD: 0.5 },
-        { MACD: -0.5 }, // Crosses below zero here
-      ];
+    it("should detect SELL signal when fast EMA crosses below slow EMA", () => {
+      const fastEMA = [12, 11, 10]; // Falling fast EMA
+      const slowEMA = [10, 10.5, 11]; // Rising slow EMA
 
-      const signal = technicalService.checkZeroCross(macdValues);
+      // Previous: fastEMA > slowEMA, Current: fastEMA < slowEMA
+      const signal = technicalService.checkEmaCrossover(fastEMA, slowEMA);
 
       expect(signal).to.equal("SELL");
     });
 
-    it("should return HOLD when MACD doesn't cross zero", () => {
-      // All positive values
-      const macdValues1 = [{ MACD: 1.5 }, { MACD: 1.8 }, { MACD: 2.0 }];
+    it("should return HOLD when EMAs don't cross", () => {
+      // Fast EMA always above slow EMA
+      const fastEMA1 = [12, 13, 14];
+      const slowEMA1 = [10, 11, 12];
 
-      expect(technicalService.checkZeroCross(macdValues1)).to.equal("HOLD");
+      expect(technicalService.checkEmaCrossover(fastEMA1, slowEMA1)).to.equal(
+        "HOLD"
+      );
 
-      // All negative values
-      const macdValues2 = [{ MACD: -1.5 }, { MACD: -1.8 }, { MACD: -2.0 }];
+      // Fast EMA always below slow EMA
+      const fastEMA2 = [8, 9, 10];
+      const slowEMA2 = [12, 13, 14];
 
-      expect(technicalService.checkZeroCross(macdValues2)).to.equal("HOLD");
-    });
-
-    it("should handle exact zero MACD value", () => {
-      // Test crossing from negative to exactly zero
-      const macdValues1 = [
-        { MACD: -1.5 },
-        { MACD: -0.5 },
-        { MACD: 0 }, // Exactly zero
-      ];
-
-      // This depends on how your implementation handles exact zero,
-      // but it should be either BUY or HOLD, not SELL
-      const signal1 = technicalService.checkZeroCross(macdValues1);
-      expect(["BUY", "HOLD"]).to.include(signal1);
-
-      // Test crossing from positive to exactly zero
-      const macdValues2 = [
-        { MACD: 1.5 },
-        { MACD: 0.5 },
-        { MACD: 0 }, // Exactly zero
-      ];
-
-      // This should be either SELL or HOLD, not BUY
-      const signal2 = technicalService.checkZeroCross(macdValues2);
-      expect(["SELL", "HOLD"]).to.include(signal2);
+      expect(technicalService.checkEmaCrossover(fastEMA2, slowEMA2)).to.equal(
+        "HOLD"
+      );
     });
 
     it("should handle minimal data input", () => {
-      const macdValues = [{ MACD: 1.5 }];
+      const fastEMA = [12];
+      const slowEMA = [10];
 
       // With only one data point, no cross can be detected
-      expect(technicalService.checkZeroCross(macdValues)).to.equal("HOLD");
+      expect(technicalService.checkEmaCrossover(fastEMA, slowEMA)).to.equal(
+        "HOLD"
+      );
+    });
+  });
+
+  describe("calculateEmaCrossoverSignal()", () => {
+    it("should return BUY signal for uptrend crossover", () => {
+      // Create sample prices that would generate an uptrend crossover
+      const prices = [];
+      // First create a downtrend
+      for (let i = 0; i < 20; i++) {
+        prices.push(120 - i);
+      }
+      // Then create an uptrend that would trigger crossover
+      for (let i = 0; i < 20; i++) {
+        prices.push(100 + i * 2);
+      }
+
+      const result = technicalService.calculateEmaCrossoverSignal(prices);
+
+      expect(result.signal).to.equal("BUY");
+      expect(result.isBull).to.be.true;
+      expect(result.isBear).to.be.false;
+      expect(result.fastEMA).to.be.greaterThan(result.slowEMA);
+    });
+
+    it("should return SELL signal for downtrend crossover", () => {
+      // Create sample prices that would generate a downtrend crossover
+      const prices = [];
+      // First create an uptrend
+      for (let i = 0; i < 20; i++) {
+        prices.push(100 + i);
+      }
+      // Then create a downtrend that would trigger crossover
+      for (let i = 0; i < 20; i++) {
+        prices.push(120 - i * 2);
+      }
+
+      const result = technicalService.calculateEmaCrossoverSignal(prices);
+
+      expect(result.signal).to.equal("SELL");
+      expect(result.isBull).to.be.false;
+      expect(result.isBear).to.be.true;
+      expect(result.fastEMA).to.be.lessThan(result.slowEMA);
+    });
+
+    it("should return HOLD when no crossover is detected", () => {
+      // Create sample prices in a steady uptrend (no crossover)
+      const prices = [];
+      for (let i = 0; i < 40; i++) {
+        prices.push(100 + i);
+      }
+
+      const result = technicalService.calculateEmaCrossoverSignal(prices);
+
+      // In a steady uptrend, fast EMA should always be above slow EMA, no crossover
+      expect(result.signal).to.equal("HOLD");
+      expect(result.fastEMA).to.be.greaterThan(result.slowEMA);
+    });
+
+    it("should handle insufficient data", () => {
+      // Create very small price array
+      const prices = [100, 101, 102];
+
+      const result = technicalService.calculateEmaCrossoverSignal(prices);
+
+      expect(result.signal).to.equal("HOLD");
+      expect(result.fastEMA).to.be.null;
+      expect(result.slowEMA).to.be.null;
     });
   });
 });
