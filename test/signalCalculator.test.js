@@ -1,14 +1,16 @@
 const { expect } = require("chai");
 const sinon = require("sinon");
 const SignalCalculator = require("../src/SignalCalculator");
+const ExchangeFactory = require("../src/factories/exchange.factory");
+const IndicatorManager = require("../src/managers/indicator.manager");
 
 describe("SignalCalculator", () => {
   let calculator;
-  let mockBinanceService;
   let mockKuCoinService;
   let mockYahooService;
   let mockNotificationService;
-  let mockTechnicalService;
+  let mockIndicatorManager;
+  let mockExchangeFactory;
 
   // Sample price data that would generate specific MACD signals
   const buySignalPrices = [
@@ -23,10 +25,6 @@ describe("SignalCalculator", () => {
 
   beforeEach(() => {
     // Initialize mock services
-    mockBinanceService = {
-      getPrices: sinon.stub().resolves(buySignalPrices),
-    };
-
     mockKuCoinService = {
       getPrices: sinon.stub().resolves(buySignalPrices),
     };
@@ -40,14 +38,19 @@ describe("SignalCalculator", () => {
       sendToTelegram: sinon.stub().resolves(),
     };
 
-    // Create mock MACD values that would correspond to the price data
-    mockTechnicalService = {
-      calculateMACD: sinon.stub().returns([
-        { MACD: -0.5, signal: -0.3, histogram: -0.2 },
-        { MACD: 0.5, signal: 0.3, histogram: 0.2 },
-      ]),
-      checkZeroCross: sinon.stub(),
+    // Set default value for analyzePrice to avoid undefined errors during tests
+    mockIndicatorManager = {
+      analyzePrice: sinon.stub().returns({ signal: "HOLD", macd: 0 }),
     };
+
+    // Mock exchange factory
+    mockExchangeFactory = sinon.createStubInstance(ExchangeFactory);
+    mockExchangeFactory.createExchange
+      .withArgs("kucoin", "1d")
+      .returns(mockKuCoinService);
+    mockExchangeFactory.createExchange
+      .withArgs("yahoo", "1d")
+      .returns(mockYahooService);
 
     // Initialize calculator with test configuration
     calculator = new SignalCalculator({
@@ -57,11 +60,12 @@ describe("SignalCalculator", () => {
     });
 
     // Replace real services with mocks
-    calculator.binanceService = mockBinanceService;
-    calculator.kucoinService = mockKuCoinService;
-    calculator.yahooService = mockYahooService;
+    calculator.exchangeServices = {
+      crypto: mockKuCoinService,
+      stocks: mockYahooService,
+    };
     calculator.notificationService = mockNotificationService;
-    calculator.technicalService = mockTechnicalService;
+    calculator.indicatorManager = mockIndicatorManager;
   });
 
   afterEach(() => {
@@ -70,7 +74,11 @@ describe("SignalCalculator", () => {
 
   describe("checkSignals()", () => {
     it("should process crypto signals correctly for BUY signal", async () => {
-      mockTechnicalService.checkZeroCross.returns("BUY");
+      // Setup indicator manager mock to return BUY signals
+      mockIndicatorManager.analyzePrice.returns({
+        signal: "BUY",
+        macd: 0.5,
+      });
 
       const signals = await calculator.checkSignals();
 
@@ -82,8 +90,41 @@ describe("SignalCalculator", () => {
       );
     });
 
+    it("should use previous day data when option is enabled", async () => {
+      // Setup indicator manager mock to return BUY signals
+      mockIndicatorManager.analyzePrice.returns({
+        signal: "BUY",
+        macd: 0.5,
+      });
+
+      const signals = await calculator.checkSignals({ usePreviousDay: true });
+
+      // Verify that analyzePrice was called with previous day data (one less item)
+      const analysisCall = mockIndicatorManager.analyzePrice.firstCall;
+      expect(analysisCall.args[0].length).to.be.lessThan(
+        buySignalPrices.length
+      );
+
+      // Verify signal still includes current price
+      expect(signals.crypto["BTC/USDT"].price).to.equal(
+        buySignalPrices[buySignalPrices.length - 1]
+      );
+
+      // Verify previous day price is included
+      expect(signals.crypto["BTC/USDT"].previousDayPrice).to.equal(
+        buySignalPrices[buySignalPrices.length - 2]
+      );
+
+      // Verify flag is set correctly
+      expect(signals.crypto["BTC/USDT"].usingPreviousDayData).to.be.true;
+    });
+
     it("should process stock signals correctly for SELL signal", async () => {
-      mockTechnicalService.checkZeroCross.returns("SELL");
+      // Setup indicator manager mock to return SELL signals
+      mockIndicatorManager.analyzePrice.returns({
+        signal: "SELL",
+        macd: -0.5,
+      });
 
       const signals = await calculator.checkSignals();
 
@@ -96,7 +137,11 @@ describe("SignalCalculator", () => {
     });
 
     it("should skip HOLD signals", async () => {
-      mockTechnicalService.checkZeroCross.returns("HOLD");
+      // Setup indicator manager mock to return HOLD signals
+      mockIndicatorManager.analyzePrice.returns({
+        signal: "HOLD",
+        macd: 0.1,
+      });
 
       const signals = await calculator.checkSignals();
 
@@ -123,11 +168,14 @@ describe("SignalCalculator", () => {
 
   describe("scan()", () => {
     it("should send notifications when signals are found", async () => {
-      mockTechnicalService.checkZeroCross.returns("BUY");
+      // Setup indicator manager mock to return BUY signals
+      mockIndicatorManager.analyzePrice.returns({
+        signal: "BUY",
+        macd: 0.5,
+      });
 
       await calculator.scan();
 
-      // expect(mockNotificationService.sendToLine.calledOnce).to.be.true;
       expect(mockNotificationService.sendToTelegram.calledOnce).to.be.true;
 
       // Verify notification content
@@ -137,7 +185,11 @@ describe("SignalCalculator", () => {
     });
 
     it("should not send notifications when no signals are found", async () => {
-      mockTechnicalService.checkZeroCross.returns("HOLD");
+      // Setup indicator manager mock to return HOLD signals
+      mockIndicatorManager.analyzePrice.returns({
+        signal: "HOLD",
+        macd: 0.1,
+      });
 
       await calculator.scan();
 
@@ -146,13 +198,20 @@ describe("SignalCalculator", () => {
     });
 
     it("should handle notification service errors", async () => {
-      mockTechnicalService.checkZeroCross.returns("BUY");
+      // Setup indicator manager mock to return BUY signals
+      mockIndicatorManager.analyzePrice.returns({
+        signal: "BUY",
+        macd: 0.5,
+      });
+
       mockNotificationService.sendToTelegram.rejects(
         new Error("Notification Error")
       );
 
       try {
         await calculator.scan();
+        // If we get here, the test should fail
+        expect.fail("Should have thrown an error");
       } catch (error) {
         expect(error.message).to.equal("Notification Error");
       }
@@ -160,19 +219,17 @@ describe("SignalCalculator", () => {
 
     it("should process multiple symbols and combine signals", async () => {
       // Set up different signals for different symbols
-      mockTechnicalService.checkZeroCross
+      mockIndicatorManager.analyzePrice
         .onFirstCall()
-        .returns("BUY") // BTC-USDT
+        .returns({ signal: "BUY", macd: 0.5 }) // BTC-USDT
         .onSecondCall()
-        .returns("SELL") // ETH-USDT
+        .returns({ signal: "SELL", macd: -0.5 }) // ETH-USDT
         .onThirdCall()
-        .returns("HOLD") // AAPL
+        .returns({ signal: "HOLD", macd: 0.1 }) // AAPL
         .onCall(3)
-        .returns("BUY"); //GOOGL
+        .returns({ signal: "BUY", macd: 0.6 }); // GOOGL
 
       const signals = await calculator.checkSignals();
-
-      console.log(JSON.stringify(signals));
 
       // Check crypto signals
       expect(signals.crypto).to.have.property("BTC/USDT");
