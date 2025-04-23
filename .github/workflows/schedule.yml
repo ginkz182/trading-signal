@@ -3,7 +3,7 @@ name: Signal Screener
 on:
   schedule:
     # Schedule to run daily at 7:01 GMT+7
-    - cron: "1 0 * * *" # UTC
+    - cron: "13 0 * * *" # UTC
   workflow_dispatch:
 
 jobs:
