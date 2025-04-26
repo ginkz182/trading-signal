@@ -3,12 +3,12 @@ name: Signal Screener
 on:
   schedule:
     # Schedule to run daily at 7:01 GMT+7
-    - cron: "13 0 * * *" # UTC
+    - cron: "15 0 * * *" # UTC
   workflow_dispatch:
 
 jobs:
   run-script:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       # Step 1: Checkout the repository
