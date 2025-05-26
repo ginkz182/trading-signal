@@ -1,6 +1,6 @@
 /**
  * SimplifiedSignalCalculator - Main class for calculating trading signals
- * Focused on EMA crossovers using previous day data for signal generation
+ * Fixed to handle different market timing for crypto vs stocks
  */
 const NotificationService = require("./services/notification.service");
 const { formatSignals } = require("./utils/formatters");
@@ -14,7 +14,6 @@ class SignalCalculator {
 
     // Initialize notification service
     this.notificationService = new NotificationService({
-      lineToken: process.env.lineToken,
       telegramToken: process.env.TELEGRAM_BOT_TOKEN,
       telegramChatId: process.env.TELEGRAM_CHAT_ID,
     });
@@ -47,6 +46,93 @@ class SignalCalculator {
   }
 
   /**
+   * Check if stock markets are currently in trading hours
+   * @returns {boolean} - True if in trading hours
+   */
+  _isInStockTradingHours() {
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
+
+    // Skip weekends
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return false;
+    }
+
+    // US market hours: roughly 14:30-21:00 UTC (9:30-16:00 EST)
+    // Add some buffer for after-hours activity
+    return utcHour >= 13 && utcHour <= 22;
+  }
+
+  /**
+   * Check if stock markets are currently in trading hours
+   * @returns {boolean} - True if in trading hours
+   */
+  _isInStockTradingHours() {
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
+
+    // Skip weekends
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return false;
+    }
+
+    // US market hours: roughly 14:30-21:00 UTC (9:30-16:00 EST)
+    // Add some buffer for after-hours activity
+    return utcHour >= 13 && utcHour <= 22;
+  }
+
+  /**
+   * Determine how many data points to skip based on market type and timing
+   * @param {string} marketType - Market type (crypto/stocks)
+   * @param {Array} allPrices - All price data
+   * @returns {Object} - Object with prices array and latest price
+   */
+  _prepareMarketData(marketType, allPrices) {
+    if (marketType === "crypto") {
+      // Crypto: Always use previous day data (remove latest)
+      const prices = allPrices.slice(0, -1);
+      const latestPrice = allPrices[allPrices.length - 1];
+
+      return {
+        prices,
+        latestPrice,
+        dataSource: "previous_day_crypto",
+      };
+    } else {
+      // Stocks: Handle market timing
+      const inTradingHours = this._isInStockTradingHours();
+
+      if (inTradingHours) {
+        // During trading hours: latest price is incomplete "today" data, remove it
+        console.log(
+          "Stock markets in trading hours: removing latest incomplete data"
+        );
+        const prices = allPrices.slice(0, -1);
+        const latestPrice = allPrices[allPrices.length - 1];
+
+        return {
+          prices,
+          latestPrice,
+          dataSource: "previous_day_stock_trading_hours",
+        };
+      } else {
+        // Outside trading hours/weekends: latest price is complete previous trading day data
+        console.log("Stock markets closed: using latest complete data");
+        const prices = allPrices;
+        const latestPrice = allPrices[allPrices.length - 1];
+
+        return {
+          prices,
+          latestPrice,
+          dataSource: "complete_stock_data_market_closed",
+        };
+      }
+    }
+  }
+
+  /**
    * Process a single trading pair and check for signals
    * @param {string} symbol - Trading pair symbol
    * @param {string} marketType - Market type (crypto/stocks)
@@ -65,12 +151,14 @@ class SignalCalculator {
         return null;
       }
 
-      // Always use previous day's data by removing the latest price
-      const prices = allPrices.slice(0, -1);
-      const latestPrice = allPrices[allPrices.length - 1]; // Store latest price for reference
+      // Prepare market data based on market type and timing
+      const { prices, latestPrice, dataSource } = this._prepareMarketData(
+        marketType,
+        allPrices
+      );
 
       console.log(
-        `Processing ${symbol} with previous day data (${prices.length} points, excluding latest)`
+        `Processing ${symbol} (${marketType}) with ${dataSource} (${prices.length} points)`
       );
 
       // Run EMA crossover analysis
@@ -88,13 +176,14 @@ class SignalCalculator {
       if (signalData.signal && signalData.signal !== "HOLD") {
         return {
           signal: signalData.signal,
-          price: latestPrice, // Return latest price for reference
-          previousDayPrice: prices[prices.length - 1], // Previous day's close price
+          price: latestPrice,
+          previousDayPrice: prices[prices.length - 1],
           fastEMA: signalData.fastEMA,
           slowEMA: signalData.slowEMA,
           isBull: signalData.isBull,
           isBear: signalData.isBear,
           details: signalData.details,
+          dataSource, // Include data source for debugging
         };
       }
 
@@ -115,7 +204,7 @@ class SignalCalculator {
       stocks: {},
     };
 
-    console.log("Checking signals using previous day data for EMA crossovers");
+    console.log("Checking signals with market-aware timing");
 
     // Process all crypto trading pairs
     for (const symbol of this.tradingPairs.crypto) {
@@ -144,7 +233,7 @@ class SignalCalculator {
   async scan(options = {}) {
     const { sendNotification = true } = options;
 
-    console.log("Starting scan using previous day data for EMA crossovers...");
+    console.log("Starting market-aware signal scan...");
 
     const signals = await this.checkSignals();
     const hasSignals =
@@ -152,9 +241,9 @@ class SignalCalculator {
       Object.keys(signals.stocks).length > 0;
 
     if (hasSignals) {
-      const message = formatSignals(signals, { signalSource: "PREVIOUS DAY" });
+      const message = formatSignals(signals, { signalSource: "MARKET_AWARE" });
 
-      console.log("Formatted message (PREVIOUS DAY):");
+      console.log("Formatted message (MARKET_AWARE):");
       console.log(message);
 
       if (sendNotification) {
