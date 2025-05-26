@@ -15,7 +15,9 @@ class SignalCalculator {
     // Initialize notification service
     this.notificationService = new NotificationService({
       telegramToken: process.env.TELEGRAM_BOT_TOKEN,
-      telegramChatId: process.env.TELEGRAM_CHAT_ID,
+      subscriberConfig: {
+        databaseUrl: process.env.DATABASE_URL,
+      },
     });
 
     // Initialize indicator manager with EMA configuration
@@ -204,7 +206,7 @@ class SignalCalculator {
       stocks: {},
     };
 
-    console.log("Checking signals with market-aware timing");
+    console.log("Checking signals with yesterday timing");
 
     // Process all crypto trading pairs
     for (const symbol of this.tradingPairs.crypto) {
@@ -233,7 +235,7 @@ class SignalCalculator {
   async scan(options = {}) {
     const { sendNotification = true } = options;
 
-    console.log("Starting market-aware signal scan...");
+    console.log("Starting yesterday signal scan...");
 
     const signals = await this.checkSignals();
     const hasSignals =
@@ -241,9 +243,9 @@ class SignalCalculator {
       Object.keys(signals.stocks).length > 0;
 
     if (hasSignals) {
-      const message = formatSignals(signals, { signalSource: "MARKET_AWARE" });
+      const message = formatSignals(signals, { signalSource: "YESTERDAY" });
 
-      console.log("Formatted message (MARKET_AWARE):");
+      console.log("Formatted message (YESTERDAY):");
       console.log(message);
 
       if (sendNotification) {

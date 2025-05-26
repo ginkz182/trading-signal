@@ -1,26 +1,36 @@
 {
+  "name": "trading-signal",
+  "version": "1.0.0",
+  "description": "Trading signals bot with Telegram notifications and EMA analysis",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "mocha 'test/**/*.test.js' 'test/*.test.js'"
+  },
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "axios": "^1.7.9",
     "ccxt": "^4.4.47",
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "node-cron": "^3.0.3",
     "node-schedule": "^2.1.1",
     "node-telegram-bot-api": "^0.66.0",
+    "pg": "^8.16.0",
     "technicalindicators": "^3.1.0",
     "yahoo-finance2": "^2.13.3"
   },
-  "name": "trading-signal",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "mocha 'test/**/*.test.js' 'test/*.test.js'"
-  },
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "devDependencies": {
     "chai": "^5.1.2",
     "mocha": "^11.0.1",
+    "nodemon": "^3.0.1",
     "sinon": "^19.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   }
 }
