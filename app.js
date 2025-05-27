@@ -63,7 +63,7 @@ async function initializeServices() {
 
 // Schedule signal checking - runs daily at 00:01 UTC
 cron.schedule(
-  "1 0 * * *",
+  "5 0 * * *",
   async () => {
     console.log(
       "⏰ [" + new Date().toISOString() + "] Scheduled signal check starting..."
