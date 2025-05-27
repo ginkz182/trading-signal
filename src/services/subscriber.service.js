@@ -154,7 +154,7 @@ class SubscriberService {
   async isSubscribed(chatId) {
     await this.initialize();
     const subscriber = await this.getSubscriber(chatId);
-    return subscriber && subscriber.subscribed;
+    return !!(subscriber && subscriber.subscribed);
   }
 
   // Cleanup method for graceful shutdown

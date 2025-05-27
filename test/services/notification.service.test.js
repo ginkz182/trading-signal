@@ -1,15 +1,20 @@
+// test/services/notification.service.test.js
 const { expect } = require("chai");
 const sinon = require("sinon");
 const TelegramBot = require("node-telegram-bot-api");
 const NotificationService = require("../../src/services/notification.service");
+const SubscriberService = require("../../src/services/subscriber.service");
 
 describe("NotificationService", () => {
   let notificationService;
   let telegramBotStub;
+  let subscriberServiceStub;
 
   const mockConfig = {
     telegramToken: "mock-telegram-token",
-    telegramChatId: "mock-chat-id",
+    subscriberConfig: {
+      databaseUrl: "postgresql://test@localhost:5432/test",
+    },
   };
 
   beforeEach(() => {
@@ -23,6 +28,27 @@ describe("NotificationService", () => {
       .stub(TelegramBot.prototype, "sendMessage")
       .callsFake(telegramBotStub.sendMessage);
 
+    // Create a stub for SubscriberService
+    subscriberServiceStub = sinon.createStubInstance(SubscriberService);
+    subscriberServiceStub.getActiveChatIds.resolves([
+      "chat1",
+      "chat2",
+      "chat3",
+    ]);
+    subscriberServiceStub.getStats.resolves({
+      total: 5,
+      active: 3,
+      inactive: 2,
+    });
+
+    // Stub the SubscriberService constructor
+    sinon
+      .stub(SubscriberService.prototype, "getActiveChatIds")
+      .callsFake(subscriberServiceStub.getActiveChatIds);
+    sinon
+      .stub(SubscriberService.prototype, "getStats")
+      .callsFake(subscriberServiceStub.getStats);
+
     notificationService = new NotificationService(mockConfig);
   });
 
@@ -30,72 +56,155 @@ describe("NotificationService", () => {
     sinon.restore();
   });
 
-  describe("sendToTelegram()", () => {
-    it("should send message to Telegram successfully", async () => {
-      // Mock successful send
+  describe("constructor", () => {
+    it("should initialize with subscriber service", () => {
+      expect(notificationService.subscriberService).to.exist;
+      expect(notificationService.telegramToken).to.equal("mock-telegram-token");
+    });
+
+    it("should throw error if no database URL provided", () => {
+      // Temporarily remove DATABASE_URL for this test
+      const originalUrl = process.env.DATABASE_URL;
+      delete process.env.DATABASE_URL;
+
+      expect(() => {
+        new NotificationService({
+          telegramToken: "token",
+          subscriberConfig: {}, // No databaseUrl
+        });
+      }).to.throw("DATABASE_URL is required");
+
+      // Restore DATABASE_URL
+      process.env.DATABASE_URL = originalUrl;
+    });
+  });
+
+  describe("sendToSingleChat()", () => {
+    it("should send message to a single chat successfully", async () => {
       telegramBotStub.sendMessage.resolves({ message_id: 123 });
 
-      const message = "Test signal notification";
-      await notificationService.sendToTelegram(message);
+      const result = await notificationService.sendToSingleChat(
+        "chat123",
+        "Test message"
+      );
 
+      expect(result.success).to.be.true;
+      expect(result.chatId).to.equal("chat123");
       expect(telegramBotStub.sendMessage.calledOnce).to.be.true;
 
-      // Verify the chat ID and message
-      const chatIdArg = telegramBotStub.sendMessage.firstCall.args[0];
-      const messageArg = telegramBotStub.sendMessage.firstCall.args[1];
-      const optionsArg = telegramBotStub.sendMessage.firstCall.args[2];
-
-      expect(chatIdArg).to.equal("mock-chat-id");
-      expect(messageArg).to.equal(message);
-      expect(optionsArg).to.deep.include({
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      });
+      const [chatId, message, options] =
+        telegramBotStub.sendMessage.firstCall.args;
+      expect(chatId).to.equal("chat123");
+      expect(message).to.equal("Test message");
+      expect(options.parse_mode).to.equal("HTML");
     });
 
     it("should handle API errors gracefully", async () => {
-      // Mock API error
       const errorMessage = "API Error";
       telegramBotStub.sendMessage.rejects(new Error(errorMessage));
 
-      // Spy on console.error
-      const consoleErrorSpy = sinon.spy(console, "error");
-
-      const message = "Test signal notification";
-
-      // Should not throw
-      await notificationService.sendToTelegram(message);
-
-      // Should log the error
-      expect(consoleErrorSpy.called).to.be.true;
-      expect(consoleErrorSpy.firstCall.args[0]).to.include(
-        "Error sending Telegram message"
+      const result = await notificationService.sendToSingleChat(
+        "chat123",
+        "Test message"
       );
-      expect(consoleErrorSpy.firstCall.args[1].message).to.equal(errorMessage);
+
+      expect(result.success).to.be.false;
+      expect(result.error).to.equal(errorMessage);
+      expect(result.chatId).to.equal("chat123");
+    });
+  });
+
+  describe("sendToTelegram()", () => {
+    it("should send message to all active subscribers", async () => {
+      telegramBotStub.sendMessage.resolves({ message_id: 123 });
+
+      const result = await notificationService.sendToTelegram(
+        "Test signal notification"
+      );
+
+      expect(subscriberServiceStub.getActiveChatIds.calledOnce).to.be.true;
+      expect(telegramBotStub.sendMessage.callCount).to.equal(3); // 3 active subscribers
+      expect(result.success).to.be.true;
+      expect(result.totalChats).to.equal(3);
+      expect(result.successfulChats).to.equal(3);
+      expect(result.failedChats).to.equal(0);
     });
 
-    it("should handle missing configuration", async () => {
-      // Create service with incomplete configuration
-      const incompleteService = new NotificationService({
-        // Missing telegramToken and telegramChatId
-      });
+    it("should handle partial failures gracefully", async () => {
+      // First two calls succeed, third fails
+      telegramBotStub.sendMessage
+        .onFirstCall()
+        .resolves({ message_id: 123 })
+        .onSecondCall()
+        .resolves({ message_id: 124 })
+        .onThirdCall()
+        .rejects(new Error("API Error"));
 
-      // Spy on console.log
-      const consoleLogSpy = sinon.spy(console, "log");
-
-      const message = "Test signal notification";
-
-      // Should not throw
-      const result = await incompleteService.sendToTelegram(message);
-
-      // Should log the message
-      expect(consoleLogSpy.called).to.be.true;
-      expect(consoleLogSpy.firstCall.args[0]).to.include(
-        "Telegram configuration missing"
+      const result = await notificationService.sendToTelegram(
+        "Test signal notification"
       );
 
-      // Should not attempt to send message
+      expect(result.success).to.be.true; // Still successful since some messages sent
+      expect(result.totalChats).to.equal(3);
+      expect(result.successfulChats).to.equal(2);
+      expect(result.failedChats).to.equal(1);
+    });
+
+    it("should handle no active subscribers", async () => {
+      subscriberServiceStub.getActiveChatIds.resolves([]);
+
+      const result = await notificationService.sendToTelegram(
+        "Test signal notification"
+      );
+
+      expect(result.success).to.be.false;
+      expect(result.totalChats).to.equal(0);
       expect(telegramBotStub.sendMessage.called).to.be.false;
+    });
+
+    it("should handle missing telegram token", async () => {
+      const serviceWithoutToken = new NotificationService({
+        subscriberConfig: {
+          databaseUrl: "postgresql://test@localhost:5432/test",
+        },
+      });
+
+      const result = await serviceWithoutToken.sendToTelegram("Test message");
+
+      expect(result.success).to.be.false;
+      expect(result.error).to.equal("No token");
+    });
+  });
+
+  describe("sendBroadcast()", () => {
+    it("should send broadcast message to all active subscribers", async () => {
+      telegramBotStub.sendMessage.resolves({ message_id: 123 });
+
+      const results = await notificationService.sendBroadcast(
+        "Broadcast message"
+      );
+
+      expect(results).to.have.lengthOf(3);
+      expect(results.every((r) => r.success)).to.be.true;
+      expect(telegramBotStub.sendMessage.callCount).to.equal(3);
+    });
+  });
+
+  describe("getStats()", () => {
+    it("should return subscriber statistics", async () => {
+      const stats = await notificationService.getStats();
+
+      expect(stats.total).to.equal(5);
+      expect(stats.active).to.equal(3);
+      expect(stats.inactive).to.equal(2);
+      expect(subscriberServiceStub.getStats.calledOnce).to.be.true;
+    });
+  });
+
+  describe("getSubscriberService()", () => {
+    it("should return subscriber service instance", () => {
+      // This method might not exist in the simplified version
+      expect(notificationService.subscriberService).to.exist;
     });
   });
 });
