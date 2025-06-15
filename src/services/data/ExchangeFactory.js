@@ -1,9 +1,9 @@
 /**
  * ExchangeFactory - Factory pattern for creating exchange service instances
  */
-const BinanceService = require("../services/binance.service");
-const KuCoinService = require("../services/kucoin.service");
-const YahooFinanceService = require("../services/yahoo.service");
+const BinanceService = require("../binance.service");
+const KuCoinService = require("./KuCoinDataService");
+const YahooFinanceService = require("./YahooDataService");
 
 class ExchangeFactory {
   /**

@@ -20,7 +20,7 @@ function formatSignals(signals, options = {}) {
 
   // Add signal source indicator if provided
   if (signalSource !== "CURRENT") {
-    message += `((${signalSource} SIGNALS))\n`.toLowerCase();
+    message += `((${signalSource} signals))\n`.toLowerCase();
   }
 
   // Format crypto signals
@@ -28,9 +28,10 @@ function formatSignals(signals, options = {}) {
     message += "\n💰<b> CRYPTO</b>\n";
 
     for (const [symbol, data] of Object.entries(signals.crypto)) {
+      const price = formatPrice(data.price, "crypto");
       message += `${formatSignalEmoji(data.signal)} ${symbol}: ${
         data.signal
-      }\n`;
+      } @ ${price}\n`;
 
       /**
       message += `  Price: ${data.price.toFixed(3)}\n`;
@@ -66,9 +67,10 @@ function formatSignals(signals, options = {}) {
     message += "\n<b>📈 STOCKS</b>\n";
 
     for (const [symbol, data] of Object.entries(signals.stocks)) {
+      const price = formatPrice(data.price, "stock");
       message += `${formatSignalEmoji(data.signal)} ${symbol}: ${
         data.signal
-      }\n`;
+      } @ ${price}\n`;
 
       /**
       message += `  Price: ${data.price.toFixed(2)}\n`;
@@ -100,6 +102,36 @@ function formatSignals(signals, options = {}) {
   }
 
   return message;
+}
+
+/**
+ * Format price based on asset type
+ * @param {number} price - Price value
+ * @param {string} assetType - 'crypto' or 'stock'
+ * @returns {string} - Formatted price
+ */
+function formatPrice(price, assetType = "crypto") {
+  if (!price || isNaN(price)) return "N/A";
+
+  const numPrice = parseFloat(price);
+
+  if (assetType === "crypto") {
+    // Crypto prices - smart formatting
+    if (numPrice >= 1000) {
+      return `$${numPrice.toLocaleString("en-US", {
+        maximumFractionDigits: 2,
+      })}`;
+    } else if (numPrice >= 1) {
+      return `$${numPrice.toFixed(4)}`;
+    } else if (numPrice >= 0.01) {
+      return `$${numPrice.toFixed(6)}`;
+    } else {
+      return `$${numPrice.toFixed(8)}`;
+    }
+  } else {
+    // Stock prices - 2 decimal places
+    return `$${numPrice.toFixed(2)}`;
+  }
 }
 
 /**
@@ -176,4 +208,5 @@ module.exports = {
   formatSignalEmoji,
   formatZoneEmoji,
   formatTechnicalData,
+  formatPrice,
 };

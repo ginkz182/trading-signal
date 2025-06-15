@@ -2,7 +2,7 @@
 require("dotenv").config();
 const express = require("express");
 const cron = require("node-cron");
-const SignalCalculator = require("./src/SignalCalculator");
+const SignalCalculator = require("./src/core/SignalCalculator");
 const TelegramBotHandler = require("./src/services/telegram-bot-handler");
 const config = require("./src/config");
 
@@ -132,6 +132,151 @@ app.post("/trigger-scan", async (req, res) => {
   }
 });
 
+// Add this after your existing endpoints
+
+// Update your existing /memory endpoint:
+app.get("/memory", (req, res) => {
+  if (signalCalculator && signalCalculator.getMemoryAnalysis) {
+    const analysis = signalCalculator.getMemoryAnalysis();
+    res.json(analysis); // Now includes servicePool stats
+  } else {
+    res.json({ error: "Memory monitoring not available" });
+  }
+});
+
+// Add new service management endpoint:
+app.post("/restart-services", async (req, res) => {
+  try {
+    if (!signalCalculator) {
+      return res.status(503).json({ error: "Calculator not initialized" });
+    }
+
+    console.log("🔄 Restarting services via API...");
+    await signalCalculator.restartServices();
+
+    res.json({
+      message: "Services restarted successfully",
+      timestamp: new Date().toISOString(),
+      note: "Services will be recreated on next scan",
+    });
+  } catch (error) {
+    console.error("Error restarting services:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add service pool status endpoint:
+app.get("/services", (req, res) => {
+  if (signalCalculator && signalCalculator.servicePool) {
+    const stats = signalCalculator.servicePool.getStats();
+    res.json({
+      pool: stats,
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    res.json({ error: "Service pool not available" });
+  }
+});
+
+// Force garbage collection endpoint
+app.post("/gc", (req, res) => {
+  if (signalCalculator && signalCalculator.memoryMonitor) {
+    const freed = signalCalculator.memoryMonitor.forceGarbageCollection();
+    res.json({
+      message: "Garbage collection forced",
+      freedMB: freed,
+      newAnalysis: signalCalculator.getMemoryAnalysis(),
+    });
+  } else {
+    res.json({ error: "Memory monitor not available" });
+  }
+});
+
+// Enhanced memory endpoint with full analytics
+app.get("/analytics", (req, res) => {
+  if (!signalCalculator) {
+    return res.status(503).json({ error: "Calculator not initialized" });
+  }
+
+  const analysis = signalCalculator.getMemoryAnalysis();
+
+  res.json({
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    nodeVersion: process.version,
+    environment: process.env.NODE_ENV || "development",
+    ...analysis,
+  });
+});
+
+// Performance summary endpoint
+app.get("/performance", (req, res) => {
+  if (!signalCalculator) {
+    return res.status(503).json({ error: "Calculator not initialized" });
+  }
+
+  const analysis = signalCalculator.getMemoryAnalysis();
+
+  const performanceSummary = {
+    status: "optimized",
+    memory: {
+      current: analysis.memory?.current?.heapUsed || 0,
+      average: analysis.memory?.average || 0,
+      max: analysis.memory?.max || 0,
+      gcCount: analysis.memory?.gcCount || 0,
+    },
+    services: {
+      totalRequests: analysis.servicePool?.totalRequests || 0,
+      activeServices: analysis.servicePool?.activeServices || 0,
+      createdServices: analysis.servicePool?.createdServices || 0,
+    },
+    dataProcessing: analysis.dataProcessing
+      ? {
+          symbolsProcessed: analysis.dataProcessing.processedSymbols,
+          averageDataPoints: analysis.dataProcessing.averageDataPointsPerSymbol,
+          limitingRate: analysis.dataProcessing.limitingRate + "%",
+          rejectionRate: analysis.dataProcessing.rejectionRate + "%",
+        }
+      : null,
+    scans: analysis.scanCount,
+    tradingPairs:
+      analysis.config?.cryptoPairs + analysis.config?.stockPairs || 0,
+  };
+
+  res.json(performanceSummary);
+});
+
+// Data processing statistics endpoint
+app.get("/data-stats", (req, res) => {
+  if (signalCalculator && signalCalculator.dataProcessor) {
+    const stats = signalCalculator.dataProcessor.getStats();
+    res.json({
+      dataProcessing: stats,
+      limits: signalCalculator.dataProcessor.limits,
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    res.json({ error: "Data processor not available" });
+  }
+});
+
+// Reset data processing statistics
+app.post("/reset-stats", (req, res) => {
+  try {
+    if (signalCalculator && signalCalculator.dataProcessor) {
+      signalCalculator.dataProcessor.resetStats();
+      res.json({
+        message: "Data processing statistics reset",
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      res.status(503).json({ error: "Data processor not available" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Start the application
 async function start() {
   try {
@@ -153,10 +298,12 @@ async function start() {
   }
 }
 
-// Graceful shutdown handlers
+// Update your graceful shutdown to include cleanup
 process.on("SIGTERM", async () => {
   console.log("👋 Received SIGTERM, shutting down gracefully...");
-  // Close database connections if needed
+  if (signalCalculator && signalCalculator.cleanup) {
+    await signalCalculator.cleanup();
+  }
   process.exit(0);
 });
 
