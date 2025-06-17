@@ -50,13 +50,13 @@ class MarketDataProcessor {
       );
     }
 
-    this.stats.totalDataPoints += processedPrices.length;
-
     // Apply market-specific timing logic
     const { prices, latestPrice, dataSource } = this._applyMarketTimingLogic(
       processedPrices,
       marketType
     );
+
+    this.stats.totalDataPoints += prices.length;
 
     return {
       symbol,

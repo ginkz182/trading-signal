@@ -1,9 +1,9 @@
 const { expect } = require("chai");
 const sinon = require("sinon");
-const ExchangeFactory = require("../../src/factories/exchange.factory");
-const BinanceService = require("../../src/services/binance.service");
-const KuCoinService = require("../../src/services/kucoin.service");
-const YahooFinanceService = require("../../src/services/yahoo.service");
+const ExchangeFactory = require("../../../src/services/data/ExchangeFactory");
+const BinanceService = require("../../../src/services/binance.service");
+const KuCoinDataService = require("../../../src/services/data/KuCoinDataService");
+const YahooDataService = require("../../../src/services/data/YahooDataService");
 
 describe("ExchangeFactory", () => {
   let exchangeFactory;
@@ -29,7 +29,7 @@ describe("ExchangeFactory", () => {
       const timeframe = "4h";
       const exchange = exchangeFactory.createExchange("kucoin", timeframe);
 
-      expect(exchange).to.be.instanceOf(KuCoinService);
+      expect(exchange).to.be.instanceOf(KuCoinDataService);
       expect(exchange.timeframe).to.equal(timeframe);
     });
 
@@ -37,7 +37,7 @@ describe("ExchangeFactory", () => {
       const timeframe = "1w";
       const exchange = exchangeFactory.createExchange("yahoo", timeframe);
 
-      expect(exchange).to.be.instanceOf(YahooFinanceService);
+      expect(exchange).to.be.instanceOf(YahooDataService);
       expect(exchange.timeframe).to.equal(timeframe);
     });
 
@@ -47,8 +47,8 @@ describe("ExchangeFactory", () => {
       const yahooExchange = exchangeFactory.createExchange("Yahoo", "1d");
 
       expect(binanceExchange).to.be.instanceOf(BinanceService);
-      expect(kucoinExchange).to.be.instanceOf(KuCoinService);
-      expect(yahooExchange).to.be.instanceOf(YahooFinanceService);
+      expect(kucoinExchange).to.be.instanceOf(KuCoinDataService);
+      expect(yahooExchange).to.be.instanceOf(YahooDataService);
     });
 
     it("should throw error for unsupported exchange type", () => {

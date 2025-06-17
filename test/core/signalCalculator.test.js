@@ -5,9 +5,9 @@ const request = require("supertest");
 const express = require("express");
 
 // Mock the main app components with new architecture
-const SignalCalculator = require("../src/core/SignalCalculator");
-const TelegramBotHandler = require("../src/services/telegram-bot-handler");
-const config = require("../src/config");
+const SignalCalculator = require("../../src/core/SignalCalculator");
+const TelegramBotHandler = require("../../src/services/telegram-bot-handler");
+const config = require("../../src/config");
 
 describe("App Integration Tests (Optimized)", () => {
   let app;
