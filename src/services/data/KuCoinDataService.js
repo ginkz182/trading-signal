@@ -2,6 +2,7 @@ const ccxt = require("ccxt");
 
 /**
  * Fast KuCoinService - keeps markets loaded but clears data after each scan
+ * Updated: Increased data limit for better EMA accuracy
  */
 class KuCoinService {
   constructor(timeframe) {
@@ -51,9 +52,9 @@ class KuCoinService {
         throw new Error("No data returned");
       }
 
-      // 🚨 CRITICAL: Limit data aggressively to save memory
+      // UPDATED: Increased limit for better EMA accuracy
       const closingPrices = ohlcv.map((candle) => candle[4]);
-      const MEMORY_LIMIT = 60; // Only keep 60 data points
+      const MEMORY_LIMIT = 150; // INCREASED from 60 to 150 for EMA accuracy
 
       if (closingPrices.length > MEMORY_LIMIT) {
         const limitedData = closingPrices.slice(-MEMORY_LIMIT);
@@ -63,6 +64,9 @@ class KuCoinService {
         return limitedData;
       }
 
+      console.log(
+        `[MEMORY] ${symbol}: Using all ${closingPrices.length} points (within ${MEMORY_LIMIT} limit)`
+      );
       return closingPrices;
     } catch (error) {
       console.error(`Failed to fetch KuCoin prices for ${symbol}:`, error);

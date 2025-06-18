@@ -1,6 +1,5 @@
 /**
- * SimplifiedTechnicalService - Handles technical indicators calculation
- * Focused only on EMA crossovers for signal generation
+ * Fixed EMA Calculation - Debug version to match TradingView exactly
  */
 class TechnicalService {
   constructor(config = {}) {
@@ -8,16 +7,12 @@ class TechnicalService {
       fastPeriod: config.fastPeriod || 12,
       slowPeriod: config.slowPeriod || 26,
     };
+    console.log(
+      `[EMA] Initialized: Fast=${this.emaConfig.fastPeriod}, Slow=${this.emaConfig.slowPeriod}`
+    );
   }
 
-  /**
-   * Calculate EMA for a given period
-   * @param {Array} prices - Array of price values
-   * @param {Number} period - EMA period
-   * @returns {Array} - Array of EMA values
-   */
   calculateEMA(prices, period) {
-    // Return empty array if insufficient data
     if (prices.length < period) {
       return [];
     }
@@ -44,44 +39,20 @@ class TechnicalService {
     return emaValues;
   }
 
-  /**
-   * Check for EMA crossovers
-   * @param {Array} fastEMA - Array of fast EMA values
-   * @param {Array} slowEMA - Array of slow EMA values
-   * @returns {String} - "BUY", "SELL", or "HOLD" signal
-   */
-  checkEmaCrossover(fastEMA, slowEMA) {
-    if (fastEMA.length < 2 || slowEMA.length < 2) {
-      return "HOLD";
-    }
-
-    // Get the last two values for both EMAs
-    const currentFast = fastEMA[fastEMA.length - 1];
-    const previousFast = fastEMA[fastEMA.length - 2];
-    const currentSlow = slowEMA[slowEMA.length - 1];
-    const previousSlow = slowEMA[slowEMA.length - 2];
-
-    // Check for crossover up (BUY signal)
-    if (previousFast < previousSlow && currentFast > currentSlow) {
-      return "BUY";
-    }
-
-    // Check for crossover down (SELL signal)
-    if (previousFast > previousSlow && currentFast < currentSlow) {
-      return "SELL";
-    }
-
-    // No crossover
-    return "HOLD";
-  }
-
-  /**
-   * Calculate EMA crossover signal
-   * @param {Array} prices - Array of price values
-   * @returns {Object} - Signal data
-   */
   calculateEmaCrossoverSignal(prices) {
-    if (prices.length < this.emaConfig.slowPeriod + 2) {
+    const priceValues = prices.map((p) => {
+      const value = p.close || p;
+      return typeof value === "number" ? value : parseFloat(value);
+    });
+
+    console.log(`[EMA] Price data sample:`, {
+      total: priceValues.length,
+      first: priceValues[0],
+      last: priceValues[priceValues.length - 1],
+      secondLast: priceValues[priceValues.length - 2],
+    });
+
+    if (priceValues.length < this.emaConfig.slowPeriod + 5) {
       return {
         signal: "HOLD",
         fastEMA: null,
@@ -91,12 +62,27 @@ class TechnicalService {
       };
     }
 
-    // Calculate EMAs
-    const fastEMA = this.calculateEMA(prices, this.emaConfig.fastPeriod);
-    const slowEMA = this.calculateEMA(prices, this.emaConfig.slowPeriod);
+    // Calculate EMAs with debug info
+    console.log(
+      `[EMA] Calculating EMA ${this.emaConfig.fastPeriod} (fast) and EMA ${this.emaConfig.slowPeriod} (slow)`
+    );
 
-    // Ensure we have enough EMA values for crossover detection
-    if (fastEMA.length < 2 || slowEMA.length < 2) {
+    const fastEMA = this.calculateEMA(priceValues, this.emaConfig.fastPeriod);
+    const slowEMA = this.calculateEMA(priceValues, this.emaConfig.slowPeriod);
+
+    console.log(`[EMA] EMA calculation results:`);
+    console.log(
+      `  Fast EMA (${this.emaConfig.fastPeriod}): length=${
+        fastEMA.length
+      }, last=${fastEMA[fastEMA.length - 1]?.toFixed(4)}`
+    );
+    console.log(
+      `  Slow EMA (${this.emaConfig.slowPeriod}): length=${
+        slowEMA.length
+      }, last=${slowEMA[slowEMA.length - 1]?.toFixed(4)}`
+    );
+
+    if (fastEMA.length < 5 || slowEMA.length < 5) {
       return {
         signal: "HOLD",
         fastEMA: fastEMA.length > 0 ? fastEMA[fastEMA.length - 1] : null,
@@ -106,44 +92,42 @@ class TechnicalService {
       };
     }
 
-    // Get the current values
+    // Show last few EMA values for debugging
+    console.log(`[EMA] Last 3 EMA values:`);
+    for (let i = 3; i >= 1; i--) {
+      const fastIdx = fastEMA.length - i;
+      const slowIdx = slowEMA.length - i;
+      const fast = fastEMA[fastIdx];
+      const slow = slowEMA[slowIdx];
+      const daysAgo = i - 1;
+
+      console.log(
+        `  ${daysAgo} days ago: Fast EMA=${fast?.toFixed(
+          4
+        )}, Slow EMA=${slow?.toFixed(4)}`
+      );
+    }
+
+    // Get current EMA values
     const currentFastEMA = fastEMA[fastEMA.length - 1];
     const currentSlowEMA = slowEMA[slowEMA.length - 1];
-    const previousFastEMA = fastEMA[fastEMA.length - 2];
-    const previousSlowEMA = slowEMA[slowEMA.length - 2];
 
-    // Determine bull/bear state
+    console.log(
+      `[EMA] Current EMAs: Fast=${currentFastEMA.toFixed(
+        4
+      )}, Slow=${currentSlowEMA.toFixed(4)}`
+    );
+    console.log(`[EMA] TradingView should show: Fast=~654.258, Slow=~653.809`);
+    console.log(
+      `[EMA] Difference: Fast=${Math.abs(currentFastEMA - 654.258).toFixed(
+        4
+      )}, Slow=${Math.abs(currentSlowEMA - 653.809).toFixed(4)}`
+    );
+
     const isBull = currentFastEMA > currentSlowEMA;
     const isBear = currentFastEMA < currentSlowEMA;
 
-    // For BUY/SELL tests - forced signal generation for test patterns
-    // This section is test-specific and would be implemented differently in production
-    const isUptrendPattern =
-      prices.length === 40 && prices[0] > prices[19] && prices[39] > prices[20];
-    const isDowntrendPattern =
-      prices.length === 40 && prices[0] < prices[19] && prices[39] < prices[20];
-
-    if (isUptrendPattern && isBull) {
-      return {
-        signal: "BUY",
-        fastEMA: currentFastEMA,
-        slowEMA: currentSlowEMA,
-        isBull,
-        isBear,
-      };
-    }
-
-    if (isDowntrendPattern && isBear) {
-      return {
-        signal: "SELL",
-        fastEMA: currentFastEMA,
-        slowEMA: currentSlowEMA,
-        isBull,
-        isBear,
-      };
-    }
-
-    // Normal signal detection
+    // Simple crossover check
     const signal = this.checkEmaCrossover(fastEMA, slowEMA);
 
     return {
@@ -153,6 +137,45 @@ class TechnicalService {
       isBull,
       isBear,
     };
+  }
+
+  checkEmaCrossover(fastEMA, slowEMA) {
+    if (fastEMA.length < 2 || slowEMA.length < 2) {
+      return "HOLD";
+    }
+
+    // Get last two values
+    const currentFast = fastEMA[fastEMA.length - 1];
+    const previousFast = fastEMA[fastEMA.length - 2];
+    const currentSlow = slowEMA[slowEMA.length - 1];
+    const previousSlow = slowEMA[slowEMA.length - 2];
+
+    console.log(`[EMA] Crossover check:`);
+    console.log(
+      `  Previous: Fast=${previousFast.toFixed(4)}, Slow=${previousSlow.toFixed(
+        4
+      )} → ${previousFast > previousSlow ? "FAST ABOVE" : "FAST BELOW"}`
+    );
+    console.log(
+      `  Current:  Fast=${currentFast.toFixed(4)}, Slow=${currentSlow.toFixed(
+        4
+      )} → ${currentFast > currentSlow ? "FAST ABOVE" : "FAST BELOW"}`
+    );
+
+    // BUY: Fast EMA crosses above Slow EMA
+    if (previousFast < previousSlow && currentFast > currentSlow) {
+      console.log(`[EMA] 🟢 BUY: Fast EMA crossed ABOVE Slow EMA`);
+      return "BUY";
+    }
+
+    // SELL: Fast EMA crosses below Slow EMA
+    if (previousFast > previousSlow && currentFast < currentSlow) {
+      console.log(`[EMA] 🔴 SELL: Fast EMA crossed BELOW Slow EMA`);
+      return "SELL";
+    }
+
+    console.log(`[EMA] 🟡 HOLD: No crossover`);
+    return "HOLD";
   }
 }
 

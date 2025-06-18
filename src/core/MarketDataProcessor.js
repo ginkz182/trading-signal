@@ -1,14 +1,13 @@
 /**
- * MarketDataProcessor - Handles data preparation and limits
- * Separates data processing logic from fetching logic
+ * MarketDataProcessor with increased data window for better EMA accuracy
  */
 class MarketDataProcessor {
   constructor(config = {}) {
     this.limits = {
       maxHistoricalData: config.maxHistoricalData || 150,
       minRequiredData: config.minRequiredData || 28,
-      processingWindow: config.processingWindow || 80,
-      dataLimitPerSymbol: config.dataLimitPerSymbol || 100,
+      processingWindow: config.processingWindow || 150, // INCREASED from 80 to 150
+      dataLimitPerSymbol: config.dataLimitPerSymbol || 150, // INCREASED
     };
 
     this.stats = {
@@ -18,7 +17,10 @@ class MarketDataProcessor {
       rejectedSymbols: 0,
     };
 
-    console.log(`[PROCESSOR] Initialized with limits:`, this.limits);
+    console.log(
+      `[PROCESSOR] Initialized with LARGER limits for EMA accuracy:`,
+      this.limits
+    );
   }
 
   /**
@@ -46,7 +48,11 @@ class MarketDataProcessor {
       processedPrices = rawPrices.slice(-this.limits.processingWindow);
       this.stats.limitedSymbols++;
       console.log(
-        `[PROCESSOR] ${symbol}: Limited from ${originalLength} to ${this.limits.processingWindow} points for analysis`
+        `[PROCESSOR] ${symbol}: Limited from ${originalLength} to ${this.limits.processingWindow} points for better EMA accuracy`
+      );
+    } else {
+      console.log(
+        `[PROCESSOR] ${symbol}: Using all ${originalLength} points (within ${this.limits.processingWindow} limit)`
       );
     }
 
@@ -57,6 +63,12 @@ class MarketDataProcessor {
     );
 
     this.stats.totalDataPoints += prices.length;
+
+    console.log(
+      `[PROCESSOR] ${symbol}: Final analysis data: ${
+        prices.length
+      } points (EMA 26 will have ${Math.max(0, prices.length - 26 + 1)} values)`
+    );
 
     return {
       symbol,

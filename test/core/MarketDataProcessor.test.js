@@ -21,8 +21,8 @@ describe("MarketDataProcessor", () => {
       expect(processor.limits).to.deep.equal({
         maxHistoricalData: 150,
         minRequiredData: 28,
-        processingWindow: 80,
-        dataLimitPerSymbol: 100,
+        processingWindow: 150, // UPDATED from 80 to 150
+        dataLimitPerSymbol: 150, // UPDATED from 100 to 150
       });
       expect(processor.stats).to.deep.equal({
         processedSymbols: 0,
@@ -30,9 +30,10 @@ describe("MarketDataProcessor", () => {
         limitedSymbols: 0,
         rejectedSymbols: 0,
       });
+      // FIXED: Updated expected log message to match actual implementation
       expect(
         consoleLogStub.calledWith(
-          "[PROCESSOR] Initialized with limits:",
+          "[PROCESSOR] Initialized with LARGER limits for EMA accuracy:",
           processor.limits
         )
       ).to.be.true;
@@ -60,8 +61,8 @@ describe("MarketDataProcessor", () => {
       expect(customProcessor.limits).to.deep.equal({
         maxHistoricalData: 200,
         minRequiredData: 50,
-        processingWindow: 80,
-        dataLimitPerSymbol: 100,
+        processingWindow: 150, // UPDATED from 80 to 150
+        dataLimitPerSymbol: 150, // UPDATED from 100 to 150
       });
     });
   });
@@ -124,9 +125,9 @@ describe("MarketDataProcessor", () => {
     });
 
     it("should limit data when exceeding processingWindow", () => {
-      const rawPrices = Array.from({ length: 120 }, (_, i) => ({
+      const rawPrices = Array.from({ length: 200 }, (_, i) => ({
         close: 100 + i,
-      })); // Exceeds processingWindow (80)
+      })); // INCREASED from 120 to 200 to exceed new 150 limit
 
       const result = processor.prepareForAnalysis(
         rawPrices,
@@ -135,12 +136,12 @@ describe("MarketDataProcessor", () => {
       );
 
       expect(result).to.not.be.null;
-      expect(result.originalLength).to.equal(120);
-      expect(result.processedLength).to.equal(79); // 120->80 (windowing) then 80->79 (crypto slice)
+      expect(result.originalLength).to.equal(200);
+      expect(result.processedLength).to.equal(149); // 200->150 (windowing) then 150->149 (crypto slice)
       expect(processor.stats.limitedSymbols).to.equal(1);
       expect(
         consoleLogStub.calledWith(
-          "[PROCESSOR] BTC-USD: Limited from 120 to 80 points for analysis"
+          "[PROCESSOR] BTC-USD: Limited from 200 to 150 points for better EMA accuracy"
         )
       ).to.be.true;
     });
@@ -276,7 +277,8 @@ describe("MarketDataProcessor", () => {
       const rawPrices1 = Array.from({ length: 50 }, (_, i) => ({
         close: 100 + i,
       }));
-      const rawPrices2 = Array.from({ length: 120 }, (_, i) => ({
+      const rawPrices2 = Array.from({ length: 200 }, (_, i) => ({
+        // INCREASED to exceed 150 limit
         close: 200 + i,
       })); // Will be limited
       const rawPrices3 = Array.from({ length: 20 }, (_, i) => ({
@@ -291,10 +293,10 @@ describe("MarketDataProcessor", () => {
 
       expect(stats.processedSymbols).to.equal(3);
       expect(stats.rejectedSymbols).to.equal(1);
-      expect(stats.limitedSymbols).to.equal(1);
-      // Correctly calculates: 49 + 79 + 0 = 128 (from prices.length)
-      expect(stats.totalDataPoints).to.equal(128); // 49 + 79 + 0
-      expect(stats.averageDataPointsPerSymbol).to.equal(43); // Math.round(128/3)
+      expect(stats.limitedSymbols).to.equal(1); // FIXED: ETH-USD will be limited from 200 to 150
+      // Correctly calculates: 49 + 149 + 0 = 198 (from prices.length)
+      expect(stats.totalDataPoints).to.equal(198); // UPDATED: 49 + 149 + 0
+      expect(stats.averageDataPointsPerSymbol).to.equal(66); // UPDATED: Math.round(198/3)
       expect(stats.limitingRate).to.equal(33); // Math.round(1/3 * 100)
       expect(stats.rejectionRate).to.equal(33); // Math.round(1/3 * 100)
     });

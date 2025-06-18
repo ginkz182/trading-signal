@@ -28,7 +28,7 @@ class YahooFinanceService {
 
       // 🚨 CRITICAL: Limit data aggressively
       const closingPrices = result.map((quote) => quote.close);
-      const MEMORY_LIMIT = 60; // Only keep 60 data points
+      const MEMORY_LIMIT = 150; // Only keep 150 data points
 
       if (closingPrices.length > MEMORY_LIMIT) {
         const limitedData = closingPrices.slice(-MEMORY_LIMIT);
