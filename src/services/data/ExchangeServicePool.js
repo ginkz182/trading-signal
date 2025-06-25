@@ -90,6 +90,26 @@ class ExchangeServicePool {
   }
 
   /**
+   * Clear caches on all active services
+   */
+  async clearAllCaches() {
+    const serviceCount = Object.keys(this.services).length;
+    console.log(`[POOL] Clearing caches on ${serviceCount} services`);
+    
+    for (const [key, service] of Object.entries(this.services)) {
+      try {
+        if (service && service.clearCache) {
+          service.clearCache();
+        }
+      } catch (error) {
+        console.error(`[POOL] Error clearing cache for service ${key}:`, error.message);
+      }
+    }
+    
+    console.log(`[POOL] Cache clearing complete`);
+  }
+
+  /**
    * Restart specific service type
    */
   async restartService(type, timeframe) {

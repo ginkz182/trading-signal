@@ -132,6 +132,12 @@ class MarketDataProcessor {
    * Get processing statistics
    */
   getStats() {
+    // Auto-reset stats if they get too large (prevent memory growth)
+    if (this.stats.processedSymbols > 10000) {
+      console.log('[PROCESSOR] Auto-resetting stats to prevent memory growth');
+      this.resetStats();
+    }
+    
     return {
       ...this.stats,
       averageDataPointsPerSymbol:

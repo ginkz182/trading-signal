@@ -13,8 +13,8 @@ class YahooFinanceService {
   async getPrices(symbol) {
     try {
       const endDate = new Date();
-      // Reduce historical data fetch to save memory and time
-      const startDate = dayjs().subtract(45, "day").toDate(); // Reduced from 60 to 45 days
+      // Increase to get enough data for reliable EMA-26 analysis (need ~80+ trading days)
+      const startDate = dayjs().subtract(120, "day").toDate(); // Increased for EMA accuracy
 
       const result = await yahooFinance.historical(symbol, {
         period1: startDate,

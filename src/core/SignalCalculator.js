@@ -144,6 +144,9 @@ class SignalCalculator {
 
     this.memoryMonitor.takeSnapshot(`SCAN_${this.scanCount}_END`);
 
+    // Clear service caches after each scan to prevent memory buildup
+    await this.servicePool.clearAllCaches();
+
     // Trigger GC if memory is high
     if (this.memoryMonitor.shouldTriggerGC(80)) {
       // Lowered threshold

@@ -92,9 +92,20 @@ class KuCoinService {
    * Clear cached data but keep the service alive for speed
    */
   clearCache() {
-    // Don't destroy the service, just clear any internal caches
-    // Markets stay loaded for speed
-    console.log(`[MEMORY] KuCoin cache cleared (markets kept for speed)`);
+    // Add cache clear counter to avoid clearing too frequently
+    if (!this.cacheClears) this.cacheClears = 0;
+    this.cacheClears++;
+    
+    // Only clear markets every 10 cache clear calls to avoid frequent reloading
+    if (this.marketsLoaded && this.client && this.client.markets && this.cacheClears % 10 === 0) {
+      const marketCount = Object.keys(this.client.markets).length;
+      if (marketCount > 1000) {
+        console.log(`[MEMORY] Clearing ${marketCount} markets to free memory (clear #${this.cacheClears})`);
+        this.client.markets = {};
+        this.marketsLoaded = false;
+      }
+    }
+    console.log(`[MEMORY] KuCoin cache check complete (clear #${this.cacheClears})`);
   }
 
   /**
