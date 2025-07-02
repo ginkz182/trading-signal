@@ -33,6 +33,14 @@ class IndicatorManager {
       };
     }
 
+    // Warn about potential accuracy issues with EMA26
+    const recommendedMinimum = 260; // 10x the slowPeriod for stability
+    if (prices.length < recommendedMinimum) {
+      console.warn(
+        `[${symbol}] Limited data (${prices.length} points). Recommended: ${recommendedMinimum}+ for accurate EMA26. Results may be less accurate.`
+      );
+    }
+
     // Get EMA crossover signals
     const emaCrossoverSignal =
       this.technicalService.calculateEmaCrossoverSignal(prices);
