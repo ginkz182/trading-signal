@@ -44,7 +44,9 @@ class KuCoinService {
       const formattedSymbol = this.formatSymbol(symbol);
       const ohlcv = await this.client.fetchOHLCV(
         formattedSymbol,
-        this.timeframe
+        this.timeframe,
+        undefined,
+        300 // Request 300 candles for EMA26 accuracy
       );
       await this.sleep(100);
 
@@ -54,7 +56,7 @@ class KuCoinService {
 
       // UPDATED: Increased limit for better EMA accuracy
       const closingPrices = ohlcv.map((candle) => candle[4]);
-      const MEMORY_LIMIT = 150; // INCREASED from 60 to 150 for EMA accuracy
+      const MEMORY_LIMIT = 300; // INCREASED from 150 to 300 for EMA26 accuracy
 
       if (closingPrices.length > MEMORY_LIMIT) {
         const limitedData = closingPrices.slice(-MEMORY_LIMIT);

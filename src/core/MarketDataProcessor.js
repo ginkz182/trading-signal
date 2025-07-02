@@ -4,10 +4,10 @@
 class MarketDataProcessor {
   constructor(config = {}) {
     this.limits = {
-      maxHistoricalData: config.maxHistoricalData || 150,
-      minRequiredData: config.minRequiredData || 28,
-      processingWindow: config.processingWindow || 150, // INCREASED from 80 to 150
-      dataLimitPerSymbol: config.dataLimitPerSymbol || 150, // INCREASED
+      maxHistoricalData: config.maxHistoricalData || 300,
+      minRequiredData: config.minRequiredData || 260,
+      processingWindow: config.processingWindow || 300, // INCREASED to 300 for EMA26 accuracy
+      dataLimitPerSymbol: config.dataLimitPerSymbol || 300, // INCREASED
     };
 
     this.stats = {
@@ -18,7 +18,7 @@ class MarketDataProcessor {
     };
 
     console.log(
-      `[PROCESSOR] Initialized with LARGER limits for EMA accuracy:`,
+      `[PROCESSOR] Initialized with EMA26-optimized limits (260+ points):`,
       this.limits
     );
   }
@@ -134,10 +134,10 @@ class MarketDataProcessor {
   getStats() {
     // Auto-reset stats if they get too large (prevent memory growth)
     if (this.stats.processedSymbols > 10000) {
-      console.log('[PROCESSOR] Auto-resetting stats to prevent memory growth');
+      console.log("[PROCESSOR] Auto-resetting stats to prevent memory growth");
       this.resetStats();
     }
-    
+
     return {
       ...this.stats,
       averageDataPointsPerSymbol:

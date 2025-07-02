@@ -13,8 +13,8 @@ class YahooFinanceService {
   async getPrices(symbol) {
     try {
       const endDate = new Date();
-      // Increase to get enough data for reliable EMA-26 analysis (need ~80+ trading days)
-      const startDate = dayjs().subtract(120, "day").toDate(); // Increased for EMA accuracy
+      // Increase to get enough data for reliable EMA-26 analysis (need 260+ trading days)
+      const startDate = dayjs().subtract(400, "day").toDate(); // ~400 calendar days = ~280 trading days
 
       const result = await yahooFinance.historical(symbol, {
         period1: startDate,
@@ -28,7 +28,7 @@ class YahooFinanceService {
 
       // 🚨 CRITICAL: Limit data aggressively
       const closingPrices = result.map((quote) => quote.close);
-      const MEMORY_LIMIT = 150; // Only keep 150 data points
+      const MEMORY_LIMIT = 300; // Only keep 300 data points
 
       if (closingPrices.length > MEMORY_LIMIT) {
         const limitedData = closingPrices.slice(-MEMORY_LIMIT);
