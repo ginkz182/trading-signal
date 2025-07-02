@@ -3,6 +3,7 @@ const sinon = require("sinon");
 const ExchangeServicePool = require("../../../src/services/data/ExchangeServicePool");
 const KuCoinDataService = require("../../../src/services/data/KuCoinDataService");
 const YahooDataService = require("../../../src/services/data/YahooDataService");
+const PolygonDataService = require("../../../src/services/data/PolygonDataService");
 
 describe("ExchangeServicePool", () => {
   let servicePool;
@@ -53,6 +54,15 @@ describe("ExchangeServicePool", () => {
       expect(servicePool.stats.totalRequests).to.equal(1);
     });
 
+    it("should create and return a Polygon service", async () => {
+      const service = await servicePool.getService("polygon", "1d");
+
+      expect(service).to.be.instanceOf(PolygonDataService);
+      expect(service.timeframe).to.equal("1d");
+      expect(servicePool.stats.createdServices).to.equal(1);
+      expect(servicePool.stats.totalRequests).to.equal(1);
+    });
+
     it("should reuse existing service instances", async () => {
       const service1 = await servicePool.getService("kucoin", "1d");
       const service2 = await servicePool.getService("kucoin", "1d");
@@ -64,10 +74,10 @@ describe("ExchangeServicePool", () => {
 
     it("should create different instances for different configurations", async () => {
       const kucoinService = await servicePool.getService("kucoin", "1d");
-      const yahooService = await servicePool.getService("yahoo", "1d");
+      const polygonService = await servicePool.getService("polygon", "1d");
       const kucoin4hService = await servicePool.getService("kucoin", "4h");
 
-      expect(kucoinService).to.not.equal(yahooService);
+      expect(kucoinService).to.not.equal(polygonService);
       expect(kucoinService).to.not.equal(kucoin4hService);
       expect(servicePool.stats.createdServices).to.equal(3);
       expect(servicePool.stats.totalRequests).to.equal(3);
@@ -84,17 +94,17 @@ describe("ExchangeServicePool", () => {
 
     it("should handle case-insensitive service types", async () => {
       const kucoinService = await servicePool.getService("KUCOIN", "1d");
-      const yahooService = await servicePool.getService("Yahoo", "1d");
+      const polygonService = await servicePool.getService("Polygon", "1d");
 
       expect(kucoinService).to.be.instanceOf(KuCoinDataService);
-      expect(yahooService).to.be.instanceOf(YahooDataService);
+      expect(polygonService).to.be.instanceOf(PolygonDataService);
     });
   });
 
   describe("getStats()", () => {
     it("should return correct statistics", async () => {
       await servicePool.getService("kucoin", "1d");
-      await servicePool.getService("yahoo", "4h");
+      await servicePool.getService("polygon", "1d");
 
       const stats = servicePool.getStats();
 
@@ -104,7 +114,7 @@ describe("ExchangeServicePool", () => {
         totalRequests: 2,
         activeServices: 2,
       });
-      expect(stats.serviceKeys).to.deep.equal(["kucoin-1d", "yahoo-4h"]);
+      expect(stats.serviceKeys).to.deep.equal(["kucoin-1d", "polygon-1d"]);
       expect(stats.serviceDetails).to.be.an("object");
     });
 

@@ -49,8 +49,8 @@ class SignalCalculator {
   // UPDATED: Simplified _processTradingPair using data processor
   async _processTradingPair(symbol, marketType) {
     try {
-      // Get service from pool
-      const serviceType = marketType === "crypto" ? "kucoin" : "yahoo";
+      // Get service from pool - use Polygon for both crypto and stocks
+      const serviceType = "polygon";
       const exchangeService = await this.servicePool.getService(
         serviceType,
         this.config.timeframe

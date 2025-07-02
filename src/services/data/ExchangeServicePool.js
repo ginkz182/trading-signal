@@ -4,6 +4,7 @@
  */
 const KuCoinDataService = require("./KuCoinDataService");
 const YahooDataService = require("./YahooDataService");
+const PolygonDataService = require("./PolygonDataService");
 
 class ExchangeServicePool {
   constructor() {
@@ -40,6 +41,8 @@ class ExchangeServicePool {
         return new KuCoinDataService(timeframe);
       case "yahoo":
         return new YahooDataService(timeframe);
+      case "polygon":
+        return new PolygonDataService(timeframe);
       default:
         throw new Error(`Unsupported service type: ${type}`);
     }

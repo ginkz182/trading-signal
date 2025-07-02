@@ -38,17 +38,13 @@ describe("App Integration Tests (Optimized)", () => {
           destroyedServices: 0,
           totalRequests: 25,
           activeServices: 2,
-          serviceKeys: ["kucoin-1d", "yahoo-1d"],
+          serviceKeys: ["polygon-1d"],
           serviceDetails: {
-            "kucoin-1d": {
-              requestCount: 15,
-              marketsLoaded: true,
-              marketCount: 1500,
+            "polygon-1d": {
+              requestCount: 25,
+              stockCacheSize: 17,
+              cryptoCacheSize: 18,
               uptimeMs: 45000,
-            },
-            "yahoo-1d": {
-              requestCount: 10,
-              uptimeMs: 40000,
             },
           },
         },
