@@ -19,10 +19,10 @@ describe("MarketDataProcessor", () => {
   describe("constructor", () => {
     it("should initialize with default limits", () => {
       expect(processor.limits).to.deep.equal({
-        maxHistoricalData: 150,
-        minRequiredData: 28,
-        processingWindow: 150, // UPDATED from 80 to 150
-        dataLimitPerSymbol: 150, // UPDATED from 100 to 150
+        maxHistoricalData: 300,
+        minRequiredData: 260,
+        processingWindow: 300,
+        dataLimitPerSymbol: 300,
       });
       expect(processor.stats).to.deep.equal({
         processedSymbols: 0,
@@ -33,7 +33,7 @@ describe("MarketDataProcessor", () => {
       // FIXED: Updated expected log message to match actual implementation
       expect(
         consoleLogStub.calledWith(
-          "[PROCESSOR] Initialized with LARGER limits for EMA accuracy:",
+          "[PROCESSOR] Initialized with EMA26-optimized limits (260+ points):",
           processor.limits
         )
       ).to.be.true;
@@ -61,15 +61,15 @@ describe("MarketDataProcessor", () => {
       expect(customProcessor.limits).to.deep.equal({
         maxHistoricalData: 200,
         minRequiredData: 50,
-        processingWindow: 150, // UPDATED from 80 to 150
-        dataLimitPerSymbol: 150, // UPDATED from 100 to 150
+        processingWindow: 300,
+        dataLimitPerSymbol: 300,
       });
     });
   });
 
   describe("prepareForAnalysis()", () => {
     it("should process valid crypto data correctly", () => {
-      const rawPrices = Array.from({ length: 50 }, (_, i) => ({
+      const rawPrices = Array.from({ length: 300 }, (_, i) => ({
         close: 100 + i,
       }));
 
@@ -82,18 +82,18 @@ describe("MarketDataProcessor", () => {
       expect(result).to.not.be.null;
       expect(result.symbol).to.equal("BTC-USD");
       expect(result.marketType).to.equal("crypto");
-      expect(result.originalLength).to.equal(50);
-      expect(result.processedLength).to.equal(49); // Crypto slices 50->49
-      expect(result.latestPrice).to.deep.equal({ close: 149 });
+      expect(result.originalLength).to.equal(300);
+      expect(result.processedLength).to.equal(299); // Crypto slices 300->299
+      expect(result.latestPrice).to.deep.equal({ close: 399 });
       expect(result.dataSource).to.equal("crypto_previous_close");
       expect(processor.stats.processedSymbols).to.equal(1);
-      expect(processor.stats.totalDataPoints).to.equal(49); // Crypto slices 50->49
+      expect(processor.stats.totalDataPoints).to.equal(299); // Crypto slices 300->299
     });
 
     it("should reject insufficient data", () => {
-      const rawPrices = Array.from({ length: 20 }, (_, i) => ({
+      const rawPrices = Array.from({ length: 200 }, (_, i) => ({
         close: 100 + i,
-      })); // Less than minRequiredData (28)
+      })); // Less than minRequiredData (260)
 
       const result = processor.prepareForAnalysis(
         rawPrices,
@@ -106,7 +106,7 @@ describe("MarketDataProcessor", () => {
       expect(processor.stats.processedSymbols).to.equal(1);
       expect(
         consoleLogStub.calledWith(
-          "[PROCESSOR] Insufficient data for BTC-USD: 20 points (need 28)"
+          "[PROCESSOR] Insufficient data for BTC-USD: 200 points (need 260)"
         )
       ).to.be.true;
     });
@@ -125,9 +125,9 @@ describe("MarketDataProcessor", () => {
     });
 
     it("should limit data when exceeding processingWindow", () => {
-      const rawPrices = Array.from({ length: 200 }, (_, i) => ({
+      const rawPrices = Array.from({ length: 400 }, (_, i) => ({
         close: 100 + i,
-      })); // INCREASED from 120 to 200 to exceed new 150 limit
+      })); // Exceed 300 limit
 
       const result = processor.prepareForAnalysis(
         rawPrices,
@@ -136,12 +136,12 @@ describe("MarketDataProcessor", () => {
       );
 
       expect(result).to.not.be.null;
-      expect(result.originalLength).to.equal(200);
-      expect(result.processedLength).to.equal(149); // 200->150 (windowing) then 150->149 (crypto slice)
+      expect(result.originalLength).to.equal(400);
+      expect(result.processedLength).to.equal(299); // 400->300 (windowing) then 300->299 (crypto slice)
       expect(processor.stats.limitedSymbols).to.equal(1);
       expect(
         consoleLogStub.calledWith(
-          "[PROCESSOR] BTC-USD: Limited from 200 to 150 points for better EMA accuracy"
+          "[PROCESSOR] BTC-USD: Limited from 400 to 300 points for better EMA accuracy"
         )
       ).to.be.true;
     });
@@ -156,14 +156,14 @@ describe("MarketDataProcessor", () => {
 
       // Re-create processor to use mocked date
       processor = new MarketDataProcessor();
-      const rawPrices = Array.from({ length: 50 }, (_, i) => ({
+      const rawPrices = Array.from({ length: 300 }, (_, i) => ({
         close: 100 + i,
       }));
 
       const result = processor.prepareForAnalysis(rawPrices, "stock", "AAPL");
 
       expect(result.dataSource).to.equal("stock_intraday_incomplete");
-      expect(result.processedLength).to.equal(49); // Stock also slices during trading hours
+      expect(result.processedLength).to.equal(299); // Stock also slices during trading hours
     });
 
     it("should apply stock market logic outside trading hours", () => {
@@ -175,14 +175,14 @@ describe("MarketDataProcessor", () => {
       dateStub = sinon.stub(global, "Date").returns(mockDate);
 
       processor = new MarketDataProcessor();
-      const rawPrices = Array.from({ length: 50 }, (_, i) => ({
+      const rawPrices = Array.from({ length: 300 }, (_, i) => ({
         close: 100 + i,
       }));
 
       const result = processor.prepareForAnalysis(rawPrices, "stock", "AAPL");
 
       expect(result.dataSource).to.equal("stock_complete_afterhours");
-      expect(result.processedLength).to.equal(50); // Uses all data after hours
+      expect(result.processedLength).to.equal(300); // Uses all data after hours
     });
 
     it("should handle weekend stock market correctly", () => {
@@ -194,14 +194,14 @@ describe("MarketDataProcessor", () => {
       dateStub = sinon.stub(global, "Date").returns(mockDate);
 
       processor = new MarketDataProcessor();
-      const rawPrices = Array.from({ length: 50 }, (_, i) => ({
+      const rawPrices = Array.from({ length: 300 }, (_, i) => ({
         close: 100 + i,
       }));
 
       const result = processor.prepareForAnalysis(rawPrices, "stock", "AAPL");
 
       expect(result.dataSource).to.equal("stock_complete_afterhours");
-      expect(result.processedLength).to.equal(50); // Uses all data on weekends
+      expect(result.processedLength).to.equal(300); // Uses all data on weekends
     });
   });
 
@@ -274,14 +274,13 @@ describe("MarketDataProcessor", () => {
   describe("getStats()", () => {
     it("should return correct statistics after processing", () => {
       // Process some data to generate stats
-      const rawPrices1 = Array.from({ length: 50 }, (_, i) => ({
+      const rawPrices1 = Array.from({ length: 300 }, (_, i) => ({
         close: 100 + i,
       }));
-      const rawPrices2 = Array.from({ length: 200 }, (_, i) => ({
-        // INCREASED to exceed 150 limit
+      const rawPrices2 = Array.from({ length: 400 }, (_, i) => ({
         close: 200 + i,
       })); // Will be limited
-      const rawPrices3 = Array.from({ length: 20 }, (_, i) => ({
+      const rawPrices3 = Array.from({ length: 200 }, (_, i) => ({
         close: 300 + i,
       })); // Will be rejected
 
@@ -293,10 +292,10 @@ describe("MarketDataProcessor", () => {
 
       expect(stats.processedSymbols).to.equal(3);
       expect(stats.rejectedSymbols).to.equal(1);
-      expect(stats.limitedSymbols).to.equal(1); // FIXED: ETH-USD will be limited from 200 to 150
-      // Correctly calculates: 49 + 149 + 0 = 198 (from prices.length)
-      expect(stats.totalDataPoints).to.equal(198); // UPDATED: 49 + 149 + 0
-      expect(stats.averageDataPointsPerSymbol).to.equal(66); // UPDATED: Math.round(198/3)
+      expect(stats.limitedSymbols).to.equal(1); // ETH-USD will be limited from 400 to 300
+      // Correctly calculates: 299 + 299 + 0 = 598 (from prices.length)
+      expect(stats.totalDataPoints).to.equal(598); // 299 + 299 + 0
+      expect(stats.averageDataPointsPerSymbol).to.equal(199); // Math.round(598/3)
       expect(stats.limitingRate).to.equal(33); // Math.round(1/3 * 100)
       expect(stats.rejectionRate).to.equal(33); // Math.round(1/3 * 100)
     });
@@ -319,7 +318,7 @@ describe("MarketDataProcessor", () => {
   describe("resetStats()", () => {
     it("should reset all statistics", () => {
       // Generate some stats first
-      const rawPrices = Array.from({ length: 50 }, (_, i) => ({
+      const rawPrices = Array.from({ length: 300 }, (_, i) => ({
         close: 100 + i,
       }));
       processor.prepareForAnalysis(rawPrices, "crypto", "BTC-USD");
