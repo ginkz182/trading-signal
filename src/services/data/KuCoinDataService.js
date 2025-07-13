@@ -41,6 +41,11 @@ class KuCoinService {
       // Ensure markets are loaded (only happens once)
       await this.ensureMarketsLoaded();
 
+      // Validate symbol exists before fetching
+      if (!this.client.markets[symbol]) {
+        throw new Error(`Symbol ${symbol} not found in markets`);
+      }
+
       const formattedSymbol = this.formatSymbol(symbol);
       const ohlcv = await this.client.fetchOHLCV(
         formattedSymbol,
