@@ -114,14 +114,20 @@ app.post("/trigger-scan", async (req, res) => {
     console.log("🔧 Manual signal scan triggered via API");
     const result = await signalCalculator.scan();
 
+    // Count signals by market type
+    const cryptoSignals = result.signals.filter(s => s.marketType === "crypto");
+    const stockSignals = result.signals.filter(s => s.marketType === "stocks");
+
     res.json({
       success: true,
-      hasSignals: !!result.message,
+      hasSignals: result.signals.length > 0,
       timestamp: new Date().toISOString(),
       signalCount: {
-        crypto: Object.keys(result.signals?.crypto || {}).length,
-        stocks: Object.keys(result.signals?.stocks || {}).length,
+        crypto: cryptoSignals.length,
+        stocks: stockSignals.length,
+        total: result.signals.length,
       },
+      notifications: result.notifications?.length || 0,
     });
   } catch (error) {
     console.error("❌ Manual scan error:", error);

@@ -34,9 +34,12 @@ class SignalCalculator {
       patternMaxBars: this.config.patterns?.maxBars || 100,
       patternTolerance: this.config.patterns?.tolerance || 0.02,
       patternMinTouchPoints: this.config.patterns?.minTouchPoints || 3,
-      patternVolumeConfirmation: this.config.patterns?.volumeConfirmation !== false,
-      patternBreakoutThreshold: this.config.patterns?.breakoutThreshold || 0.015,
-      patternVolumeBreakoutMultiplier: this.config.patterns?.volumeBreakoutMultiplier || 1.5,
+      patternVolumeConfirmation:
+        this.config.patterns?.volumeConfirmation !== false,
+      patternBreakoutThreshold:
+        this.config.patterns?.breakoutThreshold || 0.015,
+      patternVolumeBreakoutMultiplier:
+        this.config.patterns?.volumeBreakoutMultiplier || 1.5,
     });
 
     this.tradingPairs = {
@@ -53,7 +56,6 @@ class SignalCalculator {
 
   // REMOVE: Delete _isInStockTradingHours and _prepareMarketData methods
   // These are now handled by MarketDataProcessor
-
 
   // UPDATED: Simplified _processTradingPair using data processor
   async _processTradingPair(symbol, marketType) {
@@ -175,7 +177,7 @@ class SignalCalculator {
    */
   async _detectAllSignals(symbol, marketType) {
     const signals = [];
-    
+
     try {
       // Get service and fetch data
       const serviceType = marketType === "crypto" ? "kucoin" : "yahoo";
@@ -205,8 +207,11 @@ class SignalCalculator {
       );
 
       // Get analysis from indicator manager
-      const analysis = this.indicatorManager.analyzePrice(processedData, symbol);
-      
+      const analysis = this.indicatorManager.analyzePrice(
+        processedData,
+        symbol
+      );
+
       // 1. CDC Action Zone Signal (EMA Crossover)
       if (analysis.signal && analysis.signal !== "HOLD") {
         signals.push({
@@ -221,7 +226,8 @@ class SignalCalculator {
             slowEMA: analysis.slowEMA,
             isBull: analysis.isBull,
             isBear: analysis.isBear,
-            previousDayPrice: processedData.prices[processedData.prices.length - 1],
+            previousDayPrice:
+              processedData.prices[processedData.prices.length - 1],
           },
           dataSource: processedData.dataSource,
           dataStats: {
@@ -246,7 +252,8 @@ class SignalCalculator {
             details: {
               patternType: analysis.pattern.pattern,
               direction: analysis.pattern.direction,
-              breakoutStatus: analysis.pattern.breakout?.status || 'FORMING',
+              breakoutStatus: analysis.pattern.breakout?.status || "FORMING",
+              breakout: analysis.pattern.breakout, // Full breakout data
               tradingPlan: analysis.pattern.tradingPlan,
               reliability: analysis.pattern.reliability,
             },
@@ -265,7 +272,6 @@ class SignalCalculator {
       // - RSI Overbought/Oversold
       // - MACD Signal
       // - etc.
-
     } catch (error) {
       console.error(
         `[CALCULATOR] Error detecting signals for ${marketType} ${symbol}:`,
@@ -278,21 +284,36 @@ class SignalCalculator {
 
   /**
    * Determine signal from pattern analysis
+   * Takes into account pattern type and expected direction
    */
   _determinePatternSignal(patternAnalysis) {
-    const { breakout } = patternAnalysis;
-    
-    // Breakout signals override pattern formation
-    if (breakout?.status === 'BREAKOUT_UP') {
-      return 'BUY';
-    } else if (breakout?.status === 'BREAKOUT_DOWN') {
-      return 'SELL';
-    } else if (breakout?.status === 'APPROACHING_RESISTANCE' || 
-               breakout?.status === 'APPROACHING_SUPPORT') {
-      return 'WATCH'; // Special signal for approaching breakout
+    const { breakout, direction } = patternAnalysis;
+
+    // Breakout signals - must match pattern's expected direction
+    if (breakout?.status === "BREAKOUT_UP") {
+      // Ascending Triangle or Symmetrical Triangle breaking up = Valid bullish breakout
+      if (direction === "BULLISH" || direction === "NEUTRAL") {
+        return "BUY";
+      } else {
+        // Descending Triangle breaking up = False breakout, still watch
+        return "WATCH";
+      }
+    } else if (breakout?.status === "BREAKOUT_DOWN") {
+      // Descending Triangle or Symmetrical Triangle breaking down = Valid bearish breakout
+      if (direction === "BEARISH" || direction === "NEUTRAL") {
+        return "SELL";
+      } else {
+        // Ascending Triangle breaking down = False breakout, still watch
+        return "WATCH";
+      }
+    } else if (
+      breakout?.status === "APPROACHING_RESISTANCE" ||
+      breakout?.status === "APPROACHING_SUPPORT"
+    ) {
+      return "WATCH"; // Special signal for approaching breakout
     }
-    
-    return 'HOLD'; // Pattern forming but no actionable signal yet
+
+    return "HOLD"; // Pattern forming but no actionable signal yet
   }
 
   /**
@@ -300,13 +321,13 @@ class SignalCalculator {
    */
   _formatSignalsByType(signalType, signals) {
     const dayjs = require("dayjs");
-    
-    if (signalType === 'CDC_ACTION_ZONE') {
+
+    if (signalType === "CDC_ACTION_ZONE") {
       return this._formatCDCActionZoneSignals(signals);
-    } else if (signalType === 'PATTERN_ALERT') {
+    } else if (signalType === "PATTERN_ALERT") {
       return this._formatPatternSignals(signals);
     }
-    
+
     // Default formatting for future signal types
     return this._formatGenericSignals(signalType, signals);
   }
@@ -317,28 +338,34 @@ class SignalCalculator {
   _formatCDCActionZoneSignals(signals) {
     const dayjs = require("dayjs");
     const { formatPrice, formatSignalEmoji } = require("../utils/formatters");
-    
-    let message = `🔔<b> CDC ACTION ZONE ALERT</b> 🔔\n🗓️ ${dayjs().format("D MMM")}\n`;
+
+    let message = `🔔<b> CDC ACTION ZONE ALERT</b> 🔔\n🗓️ ${dayjs().format(
+      "D MMM"
+    )}\n`;
     message += `📊 Confirmed EMA12/26 Crossover Signals\n\n`;
 
     // Group by market type
-    const cryptoSignals = signals.filter(s => s.marketType === 'crypto');
-    const stockSignals = signals.filter(s => s.marketType === 'stocks');
+    const cryptoSignals = signals.filter((s) => s.marketType === "crypto");
+    const stockSignals = signals.filter((s) => s.marketType === "stocks");
 
     if (cryptoSignals.length > 0) {
       message += "💰<b> CRYPTO</b>\n";
-      cryptoSignals.forEach(signal => {
+      cryptoSignals.forEach((signal) => {
         const price = formatPrice(signal.price, "crypto");
-        message += `${formatSignalEmoji(signal.signal)} ${signal.symbol}: ${signal.signal} @ ${price}\n`;
+        message += `${formatSignalEmoji(signal.signal)} ${signal.symbol}: ${
+          signal.signal
+        } @ ${price}\n`;
       });
       message += "\n";
     }
 
     if (stockSignals.length > 0) {
       message += "📈<b> STOCKS</b>\n";
-      stockSignals.forEach(signal => {
+      stockSignals.forEach((signal) => {
         const price = formatPrice(signal.price, "stock");
-        message += `${formatSignalEmoji(signal.signal)} ${signal.symbol}: ${signal.signal} @ ${price}\n`;
+        message += `${formatSignalEmoji(signal.signal)} ${signal.symbol}: ${
+          signal.signal
+        } @ ${price}\n`;
       });
     }
 
@@ -346,66 +373,124 @@ class SignalCalculator {
   }
 
   /**
-   * Format Pattern Alert signals
+   * Format Pattern Alert signals with professional trading information
    */
   _formatPatternSignals(signals) {
     const dayjs = require("dayjs");
-    const { formatPrice, getPatternEmoji, formatPatternName, getConfidenceEmoji } = require("../utils/formatters");
-    
+
     let message = `🔺<b> PATTERN ALERT</b> 🔺\n🗓️ ${dayjs().format("D MMM")}\n`;
     message += `📊 Triangle Pattern Breakouts & Formations\n\n`;
 
     // Group by market type
-    const cryptoSignals = signals.filter(s => s.marketType === 'crypto');
-    const stockSignals = signals.filter(s => s.marketType === 'stocks');
+    const cryptoSignals = signals.filter((s) => s.marketType === "crypto");
+    const stockSignals = signals.filter((s) => s.marketType === "stocks");
 
     if (cryptoSignals.length > 0) {
       message += "💰<b> CRYPTO</b>\n";
-      cryptoSignals.forEach(signal => {
-        const price = formatPrice(signal.price, "crypto");
-        const patternEmoji = getPatternEmoji(signal.details.patternType);
-        const confidenceEmoji = getConfidenceEmoji(signal.confidence);
-        const patternName = formatPatternName(signal.details.patternType);
-        
-        message += `${formatSignalEmoji(signal.signal)} ${signal.symbol}: ${signal.signal} @ ${price}\n`;
-        message += `  ${patternEmoji} ${patternName} (${signal.confidence}%${confidenceEmoji})\n`;
-        
-        if (signal.details.breakoutStatus === 'BREAKOUT_UP') {
-          message += `  🚀 Bullish Breakout Confirmed!\n`;
-        } else if (signal.details.breakoutStatus === 'BREAKOUT_DOWN') {
-          message += `  💥 Bearish Breakout Confirmed!\n`;
-        } else if (signal.signal === 'WATCH') {
-          message += `  👀 Approaching breakout level\n`;
-        }
-        
-        message += `\n`;
+      cryptoSignals.forEach((signal) => {
+        message += this._formatSinglePatternSignal(signal, "crypto");
       });
     }
 
     if (stockSignals.length > 0) {
       message += "📈<b> STOCKS</b>\n";
-      stockSignals.forEach(signal => {
-        const price = formatPrice(signal.price, "stock");
-        const patternEmoji = getPatternEmoji(signal.details.patternType);
-        const confidenceEmoji = getConfidenceEmoji(signal.confidence);
-        const patternName = formatPatternName(signal.details.patternType);
-        
-        message += `${formatSignalEmoji(signal.signal)} ${signal.symbol}: ${signal.signal} @ ${price}\n`;
-        message += `  ${patternEmoji} ${patternName} (${signal.confidence}%${confidenceEmoji})\n`;
-        
-        if (signal.details.breakoutStatus === 'BREAKOUT_UP') {
-          message += `  🚀 Bullish Breakout Confirmed!\n`;
-        } else if (signal.details.breakoutStatus === 'BREAKOUT_DOWN') {
-          message += `  💥 Bearish Breakout Confirmed!\n`;
-        } else if (signal.signal === 'WATCH') {
-          message += `  👀 Approaching breakout level\n`;
-        }
-        
-        message += `\n`;
+      stockSignals.forEach((signal) => {
+        message += this._formatSinglePatternSignal(signal, "stock");
       });
     }
 
     return message;
+  }
+
+  /**
+   * Format a single pattern signal with professional trading levels
+   */
+  _formatSinglePatternSignal(signal, marketType) {
+    const {
+      formatPrice,
+      getPatternEmoji,
+      formatSignalEmoji,
+      formatPatternName,
+      getConfidenceEmoji,
+    } = require("../utils/formatters");
+
+    const patternEmoji = getPatternEmoji(signal.details.patternType);
+    const confidenceEmoji = getConfidenceEmoji(signal.confidence);
+    const patternName = formatPatternName(signal.details.patternType);
+    const plan = signal.details.tradingPlan;
+    const breakout = signal.details.breakout;
+
+    let msg = "";
+
+    // === BUY/SELL SIGNALS (Confirmed Breakouts) ===
+    if (signal.signal === "BUY") {
+      const entry = formatPrice(breakout.upperBreakout, marketType);
+      const target1 = formatPrice(plan.entry.long.target1, marketType);
+      const target2 = formatPrice(plan.entry.long.target2, marketType);
+      const stopLoss = formatPrice(plan.entry.long.stopLoss, marketType);
+      const rrRatio = plan.entry.long.riskReward.toFixed(1);
+
+      msg += `${formatSignalEmoji(signal.signal)} <b>${signal.symbol}: BUY Signal</b>\n`;
+      msg += `  ${patternEmoji} ${patternName} (${signal.confidence}%${confidenceEmoji})\n`;
+      msg += `  🚀 Bullish breakout confirmed above ${entry}\n`;
+      msg += `  🎯 Target 1: ${target1}\n`;
+      msg += `  🎯 Target 2: ${target2}\n`;
+      msg += `  🛑 Stop Loss: ${stopLoss}\n`;
+      msg += `  📊 Risk/Reward: 1:${rrRatio}\n\n`;
+
+    } else if (signal.signal === "SELL") {
+      const entry = formatPrice(breakout.lowerBreakout, marketType);
+      const target1 = formatPrice(plan.entry.short.target1, marketType);
+      const target2 = formatPrice(plan.entry.short.target2, marketType);
+      const stopLoss = formatPrice(plan.entry.short.stopLoss, marketType);
+      const rrRatio = plan.entry.short.riskReward.toFixed(1);
+
+      msg += `${formatSignalEmoji(signal.signal)} <b>${signal.symbol}: SELL Signal</b>\n`;
+      msg += `  ${patternEmoji} ${patternName} (${signal.confidence}%${confidenceEmoji})\n`;
+      msg += `  💥 Bearish breakout confirmed below ${entry}\n`;
+      msg += `  🎯 Target 1: ${target1}\n`;
+      msg += `  🎯 Target 2: ${target2}\n`;
+      msg += `  🛑 Stop Loss: ${stopLoss}\n`;
+      msg += `  📊 Risk/Reward: 1:${rrRatio}\n\n`;
+
+    // === WATCH SIGNALS ===
+    } else if (signal.signal === "WATCH") {
+      const currentPrice = formatPrice(breakout.currentPrice, marketType);
+      const resistance = formatPrice(breakout.upperBreakout, marketType);
+      const support = formatPrice(breakout.lowerBreakout, marketType);
+      const distUp = Math.abs(breakout.distanceToUpper).toFixed(1);
+      const distDown = Math.abs(breakout.distanceToLower).toFixed(1);
+
+      msg += `${formatSignalEmoji(signal.signal)} <b>${signal.symbol}: WATCH</b>\n`;
+      msg += `  ${patternEmoji} ${patternName} (${signal.confidence}%${confidenceEmoji})\n`;
+
+      // False breakout (pattern broke wrong direction)
+      if (signal.details.breakoutStatus === "BREAKOUT_UP" && signal.details.direction === "BEARISH") {
+        msg += `  ⚠️ False upward breakout on bearish pattern\n`;
+        msg += `  📍 Watch for reversal below ${support}\n`;
+        msg += `  🎯 If breaks down: Target ${formatPrice(plan.entry.short.target1, marketType)}\n\n`;
+
+      } else if (signal.details.breakoutStatus === "BREAKOUT_DOWN" && signal.details.direction === "BULLISH") {
+        msg += `  ⚠️ False downward breakout on bullish pattern\n`;
+        msg += `  📍 Watch for reversal above ${resistance}\n`;
+        msg += `  🎯 If breaks up: Target ${formatPrice(plan.entry.long.target1, marketType)}\n\n`;
+
+      // Approaching breakout
+      } else if (signal.details.breakoutStatus === "APPROACHING_RESISTANCE") {
+        msg += `  👀 Approaching resistance breakout\n`;
+        msg += `  📍 Current: ${currentPrice}\n`;
+        msg += `  ⬆️ Resistance: ${resistance} (+${distUp}% away)\n`;
+        msg += `  🎯 Breakout target: ${formatPrice(plan.entry.long.target1, marketType)}\n\n`;
+
+      } else if (signal.details.breakoutStatus === "APPROACHING_SUPPORT") {
+        msg += `  👀 Approaching support breakdown\n`;
+        msg += `  📍 Current: ${currentPrice}\n`;
+        msg += `  ⬇️ Support: ${support} (-${distDown}% away)\n`;
+        msg += `  🎯 Breakdown target: ${formatPrice(plan.entry.short.target1, marketType)}\n\n`;
+      }
+    }
+
+    return msg;
   }
 
   /**
@@ -414,12 +499,20 @@ class SignalCalculator {
   _formatGenericSignals(signalType, signals) {
     const dayjs = require("dayjs");
     const { formatPrice, formatSignalEmoji } = require("../utils/formatters");
-    
-    let message = `🚨<b> ${signalType.replace(/_/g, ' ')} ALERT</b> 🚨\n🗓️ ${dayjs().format("D MMM")}\n\n`;
 
-    signals.forEach(signal => {
-      const price = formatPrice(signal.price, signal.marketType === 'crypto' ? 'crypto' : 'stock');
-      message += `${formatSignalEmoji(signal.signal)} ${signal.symbol}: ${signal.signal} @ ${price}\n`;
+    let message = `🚨<b> ${signalType.replace(
+      /_/g,
+      " "
+    )} ALERT</b> 🚨\n🗓️ ${dayjs().format("D MMM")}\n\n`;
+
+    signals.forEach((signal) => {
+      const price = formatPrice(
+        signal.price,
+        signal.marketType === "crypto" ? "crypto" : "stock"
+      );
+      message += `${formatSignalEmoji(signal.signal)} ${signal.symbol}: ${
+        signal.signal
+      } @ ${price}\n`;
       if (signal.confidence) {
         message += `  📊 Confidence: ${signal.confidence}%\n`;
       }
@@ -440,7 +533,7 @@ class SignalCalculator {
 
       if (allSignals.length > 0) {
         console.log("[CALCULATOR] Signals found:");
-        
+
         // Group signals by type for logging
         const signalsByType = allSignals.reduce((acc, signal) => {
           acc[signal.type] = acc[signal.type] || [];
@@ -458,13 +551,17 @@ class SignalCalculator {
           const message = this._formatSignalsByType(signalType, signals);
           console.log(`\n[${signalType}] Message:`);
           console.log(message);
-          
+
           if (sendNotification) {
             await this.notificationService.sendToTelegram(message);
             console.log(`[CALCULATOR] ${signalType} notification sent`);
           }
-          
-          notifications.push({ type: signalType, message, count: signals.length });
+
+          notifications.push({
+            type: signalType,
+            message,
+            count: signals.length,
+          });
         }
 
         return { signals: allSignals, notifications };

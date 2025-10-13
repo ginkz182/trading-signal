@@ -46,16 +46,30 @@ class PatternService {
     }
 
     // Return the most confident pattern
-    const bestPattern = patterns.reduce((best, current) => 
+    const bestPattern = patterns.reduce((best, current) =>
       current.confidence > best.confidence ? current : best
     );
 
     // Add breakout analysis
     bestPattern.breakout = this._analyzeBreakout(recentData, bestPattern);
+
+    // Validate pattern has reasonable dimensions before generating trading plan
+    if (bestPattern.breakout) {
+      const { resistancePrice, supportPrice } = bestPattern.breakout;
+      const triangleHeight = Math.abs(resistancePrice - supportPrice);
+      const heightPercent = triangleHeight / supportPrice;
+
+      // Reject patterns where triangle is wider than 40% of price (too risky/unreliable)
+      if (heightPercent > 0.40) {
+        console.log(`[PATTERN] ${symbol}: ${bestPattern.pattern} rejected - triangle too wide (${(heightPercent * 100).toFixed(1)}% height)`);
+        return { pattern: null, confidence: 0, reason: 'Triangle pattern too wide for reliable trading' };
+      }
+    }
+
     bestPattern.tradingPlan = this._generateTradingPlan(bestPattern, recentData);
 
     console.log(`[PATTERN] ${symbol}: ${bestPattern.pattern} triangle detected (${bestPattern.confidence}% confidence)`);
-    
+
     return bestPattern;
   }
 
@@ -557,25 +571,37 @@ class PatternService {
     if (!pattern.convergence) return null;
 
     const latestPrice = priceData[priceData.length - 1];
-    const { price1: resistance, price2: support } = pattern.convergence;
-    
-    // Calculate breakout levels
-    const upperBreakout = Math.max(resistance, support) * (1 + this.config.breakoutThreshold);
-    const lowerBreakout = Math.min(resistance, support) * (1 - this.config.breakoutThreshold);
-    
+    const latestIndex = priceData.length - 1;
+
+    // Calculate support and resistance at the LATEST price point
+    const getLinePrice = (line, index) => {
+      if (line.type === 'horizontal') return line.price;
+      if (line.type === 'trendline') {
+        return line.startPoint.price + line.slope * (index - line.startPoint.index);
+      }
+      return 0;
+    };
+
+    const resistancePrice = getLinePrice(pattern.resistance, latestIndex);
+    const supportPrice = getLinePrice(pattern.support, latestIndex);
+
+    // Calculate breakout levels with threshold
+    const upperBreakout = resistancePrice * (1 + this.config.breakoutThreshold);
+    const lowerBreakout = supportPrice * (1 - this.config.breakoutThreshold);
+
     // Check current position
     let status = 'FORMING';
     let direction = null;
-    
+
     if (latestPrice.close > upperBreakout) {
       status = 'BREAKOUT_UP';
       direction = 'BULLISH';
     } else if (latestPrice.close < lowerBreakout) {
       status = 'BREAKOUT_DOWN';
       direction = 'BEARISH';
-    } else if (latestPrice.close > resistance * 0.99) {
+    } else if (latestPrice.close > resistancePrice * 0.99) {
       status = 'APPROACHING_RESISTANCE';
-    } else if (latestPrice.close < support * 1.01) {
+    } else if (latestPrice.close < supportPrice * 1.01) {
       status = 'APPROACHING_SUPPORT';
     }
 
@@ -584,6 +610,8 @@ class PatternService {
       direction,
       upperBreakout,
       lowerBreakout,
+      resistancePrice,
+      supportPrice,
       currentPrice: latestPrice.close,
       distanceToUpper: ((upperBreakout - latestPrice.close) / latestPrice.close) * 100,
       distanceToLower: ((latestPrice.close - lowerBreakout) / latestPrice.close) * 100
@@ -597,26 +625,45 @@ class PatternService {
     if (!pattern.breakout) return null;
 
     const currentPrice = priceData[priceData.length - 1].close;
-    const { upperBreakout, lowerBreakout } = pattern.breakout;
-    
-    // Calculate target levels based on triangle height
-    const triangleHeight = Math.abs(upperBreakout - lowerBreakout);
-    
+    const { upperBreakout, lowerBreakout, resistancePrice, supportPrice } = pattern.breakout;
+
+    // Calculate triangle height at current price level (tighter range)
+    const triangleHeight = Math.abs(resistancePrice - supportPrice);
+
+    // Long targets (for breakout up)
+    const longTarget1 = upperBreakout + (triangleHeight * 0.618); // 61.8% Fibonacci projection
+    const longTarget2 = upperBreakout + triangleHeight; // Full height projection
+    const longRisk = upperBreakout - lowerBreakout;
+    const longReward = longTarget1 - upperBreakout;
+
+    // Short targets (for breakdown down)
+    // For shorts, calculate percentage move to avoid negative prices
+    const heightPercent = triangleHeight / lowerBreakout;
+
+    // Conservative approach: limit target to reasonable percentage
+    const target1Percent = Math.min(heightPercent * 0.618, 0.5); // Max 50% down
+    const target2Percent = Math.min(heightPercent, 0.7); // Max 70% down
+
+    const shortTarget1 = lowerBreakout * (1 - target1Percent);
+    const shortTarget2 = lowerBreakout * (1 - target2Percent);
+    const shortRisk = upperBreakout - lowerBreakout;
+    const shortReward = lowerBreakout - shortTarget1;
+
     const plan = {
       entry: {
         long: {
           trigger: upperBreakout,
           stopLoss: lowerBreakout,
-          target1: upperBreakout + triangleHeight * 0.618, // 61.8% of height
-          target2: upperBreakout + triangleHeight, // Full height projection
-          riskReward: triangleHeight / (upperBreakout - lowerBreakout)
+          target1: longTarget1,
+          target2: longTarget2,
+          riskReward: longReward / longRisk
         },
         short: {
           trigger: lowerBreakout,
           stopLoss: upperBreakout,
-          target1: lowerBreakout - triangleHeight * 0.618,
-          target2: lowerBreakout - triangleHeight,
-          riskReward: triangleHeight / (upperBreakout - lowerBreakout)
+          target1: shortTarget1,
+          target2: shortTarget2,
+          riskReward: shortReward / shortRisk
         }
       },
       alerts: []
