@@ -17,7 +17,6 @@ const config = {
     "TAO/USDT",
     "SUI/USDT",
     "INJ/USDT",
-    "UNI/USDT",
   ],
   stockSymbols: [
     "NVDA",
@@ -34,9 +33,7 @@ const config = {
     "NET",
     "CRWD",
     "COST",
-    "PYPL",
-    "ABNB",
-    "NVO",
+    "GC=F",
   ],
   timeframe: "1d",
 };

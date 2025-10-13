@@ -37,10 +37,17 @@ class TechnicalService {
   }
 
   calculateEmaCrossoverSignal(prices) {
-    const priceValues = prices.map((p) => {
-      const value = p.close || p;
-      return typeof value === "number" ? value : parseFloat(value);
-    });
+    const priceValues = prices
+      .filter((p) => {
+        // Filter out null entries (e.g., non-trading days in futures)
+        if (p === null || p === undefined) return false;
+        if (typeof p === 'object' && p.close === null) return false;
+        return true;
+      })
+      .map((p) => {
+        const value = p.close || p;
+        return typeof value === "number" ? value : parseFloat(value);
+      });
 
 
     if (priceValues.length < this.emaConfig.slowPeriod + 5) {

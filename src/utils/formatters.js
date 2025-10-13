@@ -5,6 +5,23 @@ const dayjs = require("dayjs");
  */
 
 /**
+ * Symbol display name mapping for better readability
+ */
+const SYMBOL_DISPLAY_NAMES = {
+  'GC=F': 'GOLD',
+  // Add more mappings as needed
+};
+
+/**
+ * Get display name for a symbol
+ * @param {string} symbol - Original symbol
+ * @returns {string} - Display name or original symbol
+ */
+function getSymbolDisplayName(symbol) {
+  return SYMBOL_DISPLAY_NAMES[symbol] || symbol;
+}
+
+/**
  * Format signals into a readable message
  * @param {Object} signals - Signal data organized by market type
  * @param {Object} options - Formatting options
@@ -29,7 +46,8 @@ function formatSignals(signals, options = {}) {
 
     for (const [symbol, data] of Object.entries(signals.crypto)) {
       const price = formatPrice(data.price, "crypto");
-      message += `${formatSignalEmoji(data.signal)} ${symbol}: ${
+      const displayName = getSymbolDisplayName(symbol);
+      message += `${formatSignalEmoji(data.signal)} ${displayName}: ${
         data.signal
       } @ ${price}\n`;
 
@@ -68,7 +86,8 @@ function formatSignals(signals, options = {}) {
 
     for (const [symbol, data] of Object.entries(signals.stocks)) {
       const price = formatPrice(data.price, "stock");
-      message += `${formatSignalEmoji(data.signal)} ${symbol}: ${
+      const displayName = getSymbolDisplayName(symbol);
+      message += `${formatSignalEmoji(data.signal)} ${displayName}: ${
         data.signal
       } @ ${price}\n`;
 
