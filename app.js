@@ -61,7 +61,7 @@ async function initializeServices() {
   }
 }
 
-// Schedule signal checking - runs daily at 00:01 UTC
+// Schedule signal checking - runs daily at 00:05 UTC
 cron.schedule(
   "5 0 * * *",
   async () => {
