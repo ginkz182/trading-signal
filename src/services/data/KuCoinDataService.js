@@ -59,22 +59,31 @@ class KuCoinService {
         throw new Error("No data returned");
       }
 
-      // UPDATED: Increased limit for better EMA accuracy
-      const closingPrices = ohlcv.map((candle) => candle[4]);
+      // UPDATED: Return full OHLCV data for pattern detection
       const MEMORY_LIMIT = 300; // INCREASED from 150 to 300 for EMA26 accuracy
 
-      if (closingPrices.length > MEMORY_LIMIT) {
-        const limitedData = closingPrices.slice(-MEMORY_LIMIT);
+      // Apply memory limit to OHLCV data
+      let processedData = ohlcv;
+      if (ohlcv.length > MEMORY_LIMIT) {
+        processedData = ohlcv.slice(-MEMORY_LIMIT);
         console.log(
-          `[MEMORY] ${symbol}: Limited from ${closingPrices.length} to ${MEMORY_LIMIT} points`
+          `[MEMORY] ${symbol}: Limited from ${ohlcv.length} to ${MEMORY_LIMIT} OHLCV candles`
         );
-        return limitedData;
+      } else {
+        console.log(
+          `[MEMORY] ${symbol}: Using all ${ohlcv.length} OHLCV candles (within ${MEMORY_LIMIT} limit)`
+        );
       }
 
-      console.log(
-        `[MEMORY] ${symbol}: Using all ${closingPrices.length} points (within ${MEMORY_LIMIT} limit)`
-      );
-      return closingPrices;
+      // Return both OHLCV data and closing prices for backward compatibility
+      const closingPrices = processedData.map((candle) => candle[4]);
+      
+      return {
+        ohlcv: processedData, // Full OHLCV data for pattern detection
+        closingPrices,        // Closing prices for EMA calculations
+        dataType: 'ohlcv',    // Indicate data type
+        candleCount: processedData.length
+      };
     } catch (error) {
       console.error(`Failed to fetch KuCoin prices for ${symbol}:`, error);
       return null;

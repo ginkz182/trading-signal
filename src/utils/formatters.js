@@ -49,7 +49,38 @@ function formatSignals(signals, options = {}) {
       const displayName = getSymbolDisplayName(symbol);
       message += `${formatSignalEmoji(data.signal)} ${displayName}: ${
         data.signal
-      } @ ${price}\n`;
+      } @ ${price}`;
+
+      // Add pattern information if available
+      if (data.pattern && data.pattern.pattern) {
+        const patternEmoji = getPatternEmoji(data.pattern.pattern);
+        const confidenceEmoji = getConfidenceEmoji(data.pattern.confidence);
+        message += `\n  ${patternEmoji} ${formatPatternName(data.pattern.pattern)} (${data.pattern.confidence}%${confidenceEmoji})`;
+        
+        // Add breakout status if available
+        if (data.pattern.breakout && data.pattern.breakout.status !== 'FORMING') {
+          const breakoutEmoji = getBreakoutEmoji(data.pattern.breakout.status);
+          message += `\n  ${breakoutEmoji} ${formatBreakoutStatus(data.pattern.breakout.status)}`;
+        }
+
+        // Add trading plan alerts if available
+        if (data.pattern.tradingPlan && data.pattern.tradingPlan.alerts) {
+          for (const alert of data.pattern.tradingPlan.alerts.slice(0, 1)) { // Show only the first alert to keep message concise
+            message += `\n  💡 ${alert.message}`;
+          }
+        }
+      }
+
+      // Add combined signal confidence if available
+      if (data.details && data.details.combined && data.details.combined.confidence) {
+        const confidence = data.details.combined.confidence;
+        if (confidence !== 60) { // Show only if different from base confidence
+          const confidenceEmoji = getConfidenceEmoji(confidence);
+          message += `\n  🎯 Confidence: ${confidence}%${confidenceEmoji}`;
+        }
+      }
+
+      message += `\n`;
 
       /**
       message += `  Price: ${data.price.toFixed(3)}\n`;
@@ -89,7 +120,38 @@ function formatSignals(signals, options = {}) {
       const displayName = getSymbolDisplayName(symbol);
       message += `${formatSignalEmoji(data.signal)} ${displayName}: ${
         data.signal
-      } @ ${price}\n`;
+      } @ ${price}`;
+
+      // Add pattern information if available
+      if (data.pattern && data.pattern.pattern) {
+        const patternEmoji = getPatternEmoji(data.pattern.pattern);
+        const confidenceEmoji = getConfidenceEmoji(data.pattern.confidence);
+        message += `\n  ${patternEmoji} ${formatPatternName(data.pattern.pattern)} (${data.pattern.confidence}%${confidenceEmoji})`;
+        
+        // Add breakout status if available
+        if (data.pattern.breakout && data.pattern.breakout.status !== 'FORMING') {
+          const breakoutEmoji = getBreakoutEmoji(data.pattern.breakout.status);
+          message += `\n  ${breakoutEmoji} ${formatBreakoutStatus(data.pattern.breakout.status)}`;
+        }
+
+        // Add trading plan alerts if available
+        if (data.pattern.tradingPlan && data.pattern.tradingPlan.alerts) {
+          for (const alert of data.pattern.tradingPlan.alerts.slice(0, 1)) { // Show only the first alert to keep message concise
+            message += `\n  💡 ${alert.message}`;
+          }
+        }
+      }
+
+      // Add combined signal confidence if available
+      if (data.details && data.details.combined && data.details.combined.confidence) {
+        const confidence = data.details.combined.confidence;
+        if (confidence !== 60) { // Show only if different from base confidence
+          const confidenceEmoji = getConfidenceEmoji(confidence);
+          message += `\n  🎯 Confidence: ${confidence}%${confidenceEmoji}`;
+        }
+      }
+
+      message += `\n`;
 
       /**
       message += `  Price: ${data.price.toFixed(2)}\n`;
@@ -164,6 +226,8 @@ function formatSignalEmoji(signal) {
       return "🟢";
     case "SELL":
       return "🔴";
+    case "WATCH":
+      return "👀";
     default:
       return "⚪";
   }
@@ -222,10 +286,104 @@ function formatTechnicalData(data) {
   return result;
 }
 
+/**
+ * Get emoji for triangle pattern type
+ * @param {string} pattern - Pattern type
+ * @returns {string} - Pattern emoji
+ */
+function getPatternEmoji(pattern) {
+  switch (pattern) {
+    case 'ASCENDING_TRIANGLE':
+      return '📈'; // Bullish pattern
+    case 'DESCENDING_TRIANGLE':
+      return '📉'; // Bearish pattern
+    case 'SYMMETRICAL_TRIANGLE':
+      return '🔺'; // Neutral pattern
+    default:
+      return '📊'; // Generic pattern
+  }
+}
+
+/**
+ * Format pattern name for display
+ * @param {string} pattern - Pattern type
+ * @returns {string} - Formatted pattern name
+ */
+function formatPatternName(pattern) {
+  switch (pattern) {
+    case 'ASCENDING_TRIANGLE':
+      return 'Ascending Triangle';
+    case 'DESCENDING_TRIANGLE':
+      return 'Descending Triangle';
+    case 'SYMMETRICAL_TRIANGLE':
+      return 'Symmetrical Triangle';
+    default:
+      return pattern.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  }
+}
+
+/**
+ * Get emoji for confidence level
+ * @param {number} confidence - Confidence percentage
+ * @returns {string} - Confidence emoji
+ */
+function getConfidenceEmoji(confidence) {
+  if (confidence >= 85) return ' 🔥'; // Very high confidence
+  if (confidence >= 75) return ' ✨'; // High confidence
+  if (confidence >= 65) return ' ⭐'; // Good confidence
+  if (confidence >= 50) return ' 🌟'; // Medium confidence
+  return ' ⚠️'; // Low confidence
+}
+
+/**
+ * Get emoji for breakout status
+ * @param {string} status - Breakout status
+ * @returns {string} - Breakout emoji
+ */
+function getBreakoutEmoji(status) {
+  switch (status) {
+    case 'BREAKOUT_UP':
+      return '🚀'; // Bullish breakout
+    case 'BREAKOUT_DOWN':
+      return '💥'; // Bearish breakout
+    case 'APPROACHING_RESISTANCE':
+      return '⬆️'; // Approaching resistance
+    case 'APPROACHING_SUPPORT':
+      return '⬇️'; // Approaching support
+    default:
+      return '🔍'; // Generic status
+  }
+}
+
+/**
+ * Format breakout status for display
+ * @param {string} status - Breakout status
+ * @returns {string} - Formatted status
+ */
+function formatBreakoutStatus(status) {
+  switch (status) {
+    case 'BREAKOUT_UP':
+      return 'Bullish Breakout';
+    case 'BREAKOUT_DOWN':
+      return 'Bearish Breakout';
+    case 'APPROACHING_RESISTANCE':
+      return 'Approaching Resistance';
+    case 'APPROACHING_SUPPORT':
+      return 'Approaching Support';
+    default:
+      return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  }
+}
+
 module.exports = {
   formatSignals,
   formatSignalEmoji,
   formatZoneEmoji,
   formatTechnicalData,
   formatPrice,
+  getPatternEmoji,
+  formatPatternName,
+  getConfidenceEmoji,
+  getBreakoutEmoji,
+  formatBreakoutStatus,
 };

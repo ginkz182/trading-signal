@@ -26,8 +26,25 @@ class MarketDataProcessor {
   /**
    * Process raw price data for analysis
    */
-  prepareForAnalysis(rawPrices, marketType, symbol) {
+  prepareForAnalysis(rawData, marketType, symbol) {
     this.stats.processedSymbols++;
+
+    // Handle both old format (array of prices) and new format (object with OHLCV)
+    let rawPrices, ohlcvData;
+    
+    if (Array.isArray(rawData)) {
+      // Old format: array of closing prices
+      rawPrices = rawData;
+      ohlcvData = null;
+    } else if (rawData && rawData.dataType === 'ohlcv') {
+      // New format: object with OHLCV data
+      rawPrices = rawData.closingPrices;
+      ohlcvData = rawData.ohlcv;
+    } else {
+      console.log(`[PROCESSOR] Invalid data format for ${symbol}`);
+      this.stats.rejectedSymbols++;
+      return null;
+    }
 
     if (!rawPrices || rawPrices.length < this.limits.minRequiredData) {
       console.log(
@@ -70,14 +87,26 @@ class MarketDataProcessor {
       } points (EMA 26 will have ${Math.max(0, prices.length - 26 + 1)} values)`
     );
 
+    // Process OHLCV data if available
+    let processedOhlcv = null;
+    if (ohlcvData) {
+      if (ohlcvData.length > this.limits.processingWindow) {
+        processedOhlcv = ohlcvData.slice(-this.limits.processingWindow);
+      } else {
+        processedOhlcv = ohlcvData;
+      }
+    }
+
     return {
       symbol,
       prices,
+      ohlcv: processedOhlcv, // Include OHLCV data for pattern detection
       latestPrice,
       dataSource,
       originalLength,
       processedLength: prices.length,
       marketType,
+      hasOhlcv: !!processedOhlcv
     };
   }
 

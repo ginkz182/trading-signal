@@ -36,6 +36,18 @@ const config = {
     "GC=F",
   ],
   timeframe: "1d",
+  
+  // Pattern Detection Configuration
+  patterns: {
+    enabled: true,
+    minBars: 20,
+    maxBars: 100,
+    tolerance: 0.02,
+    minTouchPoints: 3,
+    volumeConfirmation: true,
+    breakoutThreshold: 0.015,
+    volumeBreakoutMultiplier: 1.5,
+  },
 };
 
 module.exports = config;
