@@ -6,9 +6,18 @@ const SubscriberService = require("./subscriber.service");
 
 class TelegramBotHandler {
   constructor(config = {}) {
-    this.bot = new TelegramBot(config.token, { polling: true });
+    this.bot = new TelegramBot(config.token, {
+      polling: {
+        interval: 1000, // Poll every 1 second (default is 300ms)
+        autoStart: true,
+        params: {
+          timeout: 10, // Long polling timeout in seconds
+        },
+      },
+    });
     this.subscriberService = new SubscriberService(config.subscriberConfig);
     this.setupCommands();
+    this.setupErrorHandling();
   }
 
   setupCommands() {
@@ -124,12 +133,66 @@ Use /start to begin receiving signals! 🚀
       });
     });
 
-    // Handle errors
+    console.log("Telegram bot commands set up successfully");
+  }
+
+  setupErrorHandling() {
+    let retryCount = 0;
+    let retryTimeout = null;
+
     this.bot.on("polling_error", (error) => {
       console.error("Telegram polling error:", error);
+
+      // Handle rate limiting (429)
+      if (error.response && error.response.statusCode === 429) {
+        const retryAfter = error.response.body?.parameters?.retry_after || 5;
+        retryCount++;
+
+        console.log(
+          `[TELEGRAM] Rate limited. Retrying after ${retryAfter}s (attempt ${retryCount})`
+        );
+
+        // Stop polling temporarily
+        this.bot.stopPolling();
+
+        // Clear any existing retry timeout
+        if (retryTimeout) clearTimeout(retryTimeout);
+
+        // Restart polling after the specified delay
+        retryTimeout = setTimeout(() => {
+          console.log("[TELEGRAM] Resuming polling...");
+          this.bot.startPolling();
+          retryCount = 0;
+        }, retryAfter * 1000);
+      }
+      // Handle connection errors (ECONNRESET, etc.)
+      else if (error.code === "EFATAL" || error.code === "ECONNRESET") {
+        retryCount++;
+        const backoffDelay = Math.min(1000 * Math.pow(2, retryCount - 1), 30000); // Max 30s
+
+        console.log(
+          `[TELEGRAM] Connection error. Retrying in ${backoffDelay / 1000}s (attempt ${retryCount})`
+        );
+
+        this.bot.stopPolling();
+
+        if (retryTimeout) clearTimeout(retryTimeout);
+
+        retryTimeout = setTimeout(() => {
+          console.log("[TELEGRAM] Resuming polling...");
+          this.bot.startPolling();
+          if (retryCount > 3) retryCount = 0; // Reset after successful reconnect attempts
+        }, backoffDelay);
+      }
     });
 
-    console.log("Telegram bot commands set up successfully");
+    // Reset retry count on successful polling
+    this.bot.on("message", () => {
+      if (retryCount > 0) {
+        console.log("[TELEGRAM] Connection restored");
+        retryCount = 0;
+      }
+    });
   }
 
   /**
@@ -139,15 +202,31 @@ Use /start to begin receiving signals! 🚀
    */
   async sendToChats(chatIds, message) {
     const results = [];
+    const BATCH_DELAY = 100; // 100ms delay between messages to avoid rate limits
 
     for (const chatId of chatIds) {
       try {
         await this.bot.sendMessage(chatId, message, { parse_mode: "HTML" });
         results.push({ chatId, success: true });
         console.log(`Message sent to ${chatId}`);
+
+        // Add delay between messages to respect Telegram rate limits
+        if (chatIds.indexOf(chatId) < chatIds.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
+        }
       } catch (error) {
         console.error(`Failed to send to ${chatId}:`, error.message);
         results.push({ chatId, success: false, error: error.message });
+
+        // If rate limited, wait longer before next message
+        if (error.response && error.response.statusCode === 429) {
+          const retryAfter =
+            error.response.body?.parameters?.retry_after || 5;
+          console.log(`[TELEGRAM] Rate limited, waiting ${retryAfter}s...`);
+          await new Promise((resolve) =>
+            setTimeout(resolve, retryAfter * 1000)
+          );
+        }
       }
     }
 
