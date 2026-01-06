@@ -46,7 +46,6 @@ class SignalCalculator {
   // REMOVE: Delete _isInStockTradingHours and _prepareMarketData methods
   // These are now handled by MarketDataProcessor
 
-
   // UPDATED: Simplified _processTradingPair using data processor
   async _processTradingPair(symbol, marketType) {
     try {
