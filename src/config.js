@@ -19,6 +19,8 @@ const config = {
     "INJ/USDT",
     "ONDO/USDT",
     "STX/USDT",
+    "AAVE/USDT",
+    "IMX/USDT",
   ],
   stockSymbols: [
     "NVDA",
@@ -37,6 +39,7 @@ const config = {
     "COST",
     "CCJ",
     "RTX",
+    "BLK",
     "GC=F",
   ],
   timeframe: "1d",
