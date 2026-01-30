@@ -42,6 +42,10 @@ describe("TelegramBotHandler", () => {
     TelegramBotHandler = proxyquire("../../src/services/telegram-bot-handler", {
       "node-telegram-bot-api": TelegramBotMock,
       "./subscriber.service": SubscriberServiceMock,
+      "../config": {
+        symbols: ["BTC/USDT", "ETH/USDT"],
+        stockSymbols: ["NVDA", "TSLA"],
+      },
     });
 
     // Stub console methods to prevent test output pollution
@@ -276,6 +280,38 @@ describe("TelegramBotHandler", () => {
       expect(chatId).to.equal(123456);
       expect(message).to.include("Trading Signals Bot Commands");
       expect(options.parse_mode).to.equal("HTML");
+    });
+  });
+
+  describe("assetlist command", () => {
+    it("should send the list of crypto and stock assets", async () => {
+      // Find the assetlist command handler from the stub
+      const assetlistCall = telegramBotStub.onText
+        .getCalls()
+        .find((call) => call.args[0].toString().includes("assetlist"));
+      const assetlistHandler = assetlistCall.args[1];
+
+      const mockMsg = {
+        chat: { id: 123456 },
+      };
+
+      // Execute the handler
+      await assetlistHandler(mockMsg);
+
+      // Assertions
+      expect(telegramBotStub.sendMessage.calledOnce).to.be.true;
+      const [chatId, message, options] =
+        telegramBotStub.sendMessage.firstCall.args;
+
+      expect(chatId).to.equal(123456);
+      expect(options.parse_mode).to.equal("HTML");
+      expect(message).to.include("Current Asset List");
+      expect(message).to.include("Crypto Assets:");
+      expect(message).to.include("Stock Assets:");
+      expect(message).to.include("BTC/USDT");
+      expect(message).to.include("ETH/USDT");
+      expect(message).to.include("NVDA");
+      expect(message).to.include("TSLA");
     });
   });
 

@@ -3,6 +3,7 @@
  */
 const TelegramBot = require("node-telegram-bot-api");
 const SubscriberService = require("./subscriber.service");
+const config = require("../config");
 
 class TelegramBotHandler {
   constructor(config = {}) {
@@ -37,6 +38,7 @@ You are now subscribed to receive trading signals.
 <b>Available Commands:</b>
 /status - Check your subscription status
 /stop - Unsubscribe from all signals
+/assetlist - See the full list of assets we're tracking
 /help - Show help message
 
 You will receive all trading signals as they become available! 📊
@@ -120,6 +122,7 @@ Use /stop to unsubscribe at any time.
 /start - Subscribe to trading signals
 /stop - Unsubscribe from all signals
 /status - Check your subscription status
+/assetlist - See the full list of assets we're tracking
 /help - Show this help message
 
 <b>About:</b>
@@ -129,6 +132,26 @@ Use /start to begin receiving signals! 🚀
       `;
 
       await this.bot.sendMessage(msg.chat.id, helpMessage, {
+        parse_mode: "HTML",
+      });
+    });
+
+    // Asset list command
+    this.bot.onText(/\/assetlist/, async (msg) => {
+      const cryptoAssets = config.symbols.join("\n");
+      const stockAssets = config.stockSymbols.join("\n");
+
+      const assetListMessage = `
+<b>Current Asset List</b>
+
+<b>Crypto Assets:</b>
+${cryptoAssets}
+
+<b>Stock Assets:</b>
+${stockAssets}
+      `;
+
+      await this.bot.sendMessage(msg.chat.id, assetListMessage, {
         parse_mode: "HTML",
       });
     });
