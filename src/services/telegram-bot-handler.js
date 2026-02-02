@@ -33,7 +33,7 @@ class TelegramBotHandler {
         const welcomeMessage = `
 🚀 <b>Welcome to Trading Signals!</b>
 
-You are now subscribed to receive trading signals.
+You are now subscribed to receive FREE trading signals.
 
 <b>Available Commands:</b>
 /status - Check your subscription status
@@ -51,7 +51,7 @@ You will receive all trading signals as they become available! 📊
         console.error("Error in /start command:", error);
         await this.bot.sendMessage(
           chatId,
-          "Sorry, there was an error subscribing you. Please try again."
+          "Sorry, there was an error subscribing you. Please try again.",
         );
       }
     });
@@ -64,13 +64,13 @@ You will receive all trading signals as they become available! 📊
         await this.subscriberService.unsubscribe(chatId);
         await this.bot.sendMessage(
           chatId,
-          "✅ You have been unsubscribed from trading signals. Use /start to subscribe again."
+          "✅ You have been unsubscribed from trading signals. Use /start to subscribe again.",
         );
       } catch (error) {
         console.error("Error in /stop command:", error);
         await this.bot.sendMessage(
           chatId,
-          "Sorry, there was an error. Please try again."
+          "Sorry, there was an error. Please try again.",
         );
       }
     });
@@ -85,19 +85,26 @@ You will receive all trading signals as they become available! 📊
         if (!subscriber || !subscriber.subscribed) {
           await this.bot.sendMessage(
             chatId,
-            "❌ You are not subscribed. Use /start to subscribe."
+            "❌ You are not subscribed. Use /start to subscribe.",
           );
           return;
         }
 
+        const tierMessage =
+          subscriber.tier === "free"
+            ? "Signals: Receiving FREE trading signals 🚀"
+            : "Signals: Receiving PREMIUM trading signals 🌟";
+
+        const subscribedDate = subscriber.subscribed_at
+          ? subscriber.subscribed_at.toLocaleDateString()
+          : "Not available";
+
         const statusMessage = `
 ✅ <b>Subscription Status: Active</b>
 
-<b>Subscribed since:</b> ${new Date(
-          subscriber.subscribedAt
-        ).toLocaleDateString()}
-<b>Signals:</b> Receiving ALL trading signals 🌟
-
+<b>Subscribed since:</b> ${subscribedDate}
+<b>Tier:</b> ${subscriber.tier === "free" ? "Free Tier" : "Premium Tier"}
+<b>${tierMessage}</b>
 Use /stop to unsubscribe at any time.
         `;
 
@@ -108,7 +115,7 @@ Use /stop to unsubscribe at any time.
         console.error("Error in /status command:", error);
         await this.bot.sendMessage(
           chatId,
-          "Sorry, there was an error checking your status."
+          "Sorry, there was an error checking your status.",
         );
       }
     });
@@ -172,7 +179,7 @@ ${stockAssets}
         retryCount++;
 
         console.log(
-          `[TELEGRAM] Rate limited. Retrying after ${retryAfter}s (attempt ${retryCount})`
+          `[TELEGRAM] Rate limited. Retrying after ${retryAfter}s (attempt ${retryCount})`,
         );
 
         // Stop polling temporarily
@@ -191,10 +198,13 @@ ${stockAssets}
       // Handle connection errors (ECONNRESET, etc.)
       else if (error.code === "EFATAL" || error.code === "ECONNRESET") {
         retryCount++;
-        const backoffDelay = Math.min(1000 * Math.pow(2, retryCount - 1), 30000); // Max 30s
+        const backoffDelay = Math.min(
+          1000 * Math.pow(2, retryCount - 1),
+          30000,
+        ); // Max 30s
 
         console.log(
-          `[TELEGRAM] Connection error. Retrying in ${backoffDelay / 1000}s (attempt ${retryCount})`
+          `[TELEGRAM] Connection error. Retrying in ${backoffDelay / 1000}s (attempt ${retryCount})`,
         );
 
         this.bot.stopPolling();
@@ -243,11 +253,10 @@ ${stockAssets}
 
         // If rate limited, wait longer before next message
         if (error.response && error.response.statusCode === 429) {
-          const retryAfter =
-            error.response.body?.parameters?.retry_after || 5;
+          const retryAfter = error.response.body?.parameters?.retry_after || 5;
           console.log(`[TELEGRAM] Rate limited, waiting ${retryAfter}s...`);
           await new Promise((resolve) =>
-            setTimeout(resolve, retryAfter * 1000)
+            setTimeout(resolve, retryAfter * 1000),
           );
         }
       }

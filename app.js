@@ -48,10 +48,10 @@ async function initializeServices() {
 
     console.log("✅ All services initialized successfully");
 
-    // Run initial signal check
-    console.log("🔍 Running initial signal check...");
-    await signalCalculator.scan({ sendNotification: false });
-    console.log("✅ Initial check completed");
+    // Run initial signal check - skip for now. we already add manual trigger endpoint
+    // console.log("🔍 Running initial signal check...");
+    // await signalCalculator.scan({ sendNotification: false });
+    // console.log("✅ Initial check completed");
   } catch (error) {
     console.error("❌ Error initializing services:", error);
     // Don't exit in production, let Railway restart the app
@@ -66,7 +66,9 @@ cron.schedule(
   "5 0 * * *",
   async () => {
     console.log(
-      "⏰ [" + new Date().toISOString() + "] Scheduled signal check starting..."
+      "⏰ [" +
+        new Date().toISOString() +
+        "] Scheduled signal check starting...",
     );
     try {
       const result = await signalCalculator.scan();
@@ -81,7 +83,7 @@ cron.schedule(
   },
   {
     timezone: "UTC",
-  }
+  },
 );
 
 // Additional endpoints for monitoring and manual control

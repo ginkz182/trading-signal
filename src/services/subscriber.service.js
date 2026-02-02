@@ -2,7 +2,16 @@
  * PostgreSQL-Only Subscriber Service
  * Works with local PostgreSQL and all cloud services
  */
-const { Pool } = require("pg");
+const { Pool, types } = require("pg");
+
+// Make node-postgres parse TIMESTAMP columns as UTC dates
+// OID for TIMESTAMP WITHOUT TIME ZONE is 1114
+types.setTypeParser(1114, (stringValue) => {
+  if (stringValue === null) {
+    return null;
+  }
+  return new Date(stringValue + "Z");
+});
 
 class SubscriberService {
   constructor(config = {}) {
@@ -41,7 +50,8 @@ class SubscriberService {
           last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           username VARCHAR(100),
           first_name VARCHAR(100),
-          last_name VARCHAR(100)
+          last_name VARCHAR(100),
+          tier VARCHAR(50) DEFAULT 'free'
         )
       `);
 
@@ -64,15 +74,16 @@ class SubscriberService {
 
     const result = await this.pool.query(
       `
-      INSERT INTO subscribers (chat_id, subscribed, last_updated, username, first_name, last_name)
-      VALUES ($1, true, CURRENT_TIMESTAMP, $2, $3, $4)
+      INSERT INTO subscribers (chat_id, subscribed, last_updated, username, first_name, last_name, tier)
+      VALUES ($1, true, CURRENT_TIMESTAMP, $2, $3, $4, 'free')
       ON CONFLICT (chat_id) 
       DO UPDATE SET 
         subscribed = true, 
         last_updated = CURRENT_TIMESTAMP,
         username = COALESCE($2, subscribers.username),
         first_name = COALESCE($3, subscribers.first_name),
-        last_name = COALESCE($4, subscribers.last_name)
+        last_name = COALESCE($4, subscribers.last_name),
+        tier = 'free'
       RETURNING *
     `,
       [chatId, userInfo.username, userInfo.first_name, userInfo.last_name]

@@ -27,6 +27,20 @@ const config = {
     "GC=F",
   ],
   timeframe: "1d",
+  tiers: {
+    free: {
+      assets: 5,
+      timeframes: ["1d"],
+    },
+    premium: {
+      assets: "all",
+      timeframes: ["1d", "4h"],
+    },
+    pro: {
+      assets: "all",
+      timeframes: ["1d", "4h", "1h"],
+    },
+  },
 };
 
 module.exports = config;

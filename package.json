@@ -7,6 +7,7 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "test": "NODE_ENV=test DATABASE_URL=postgresql://test@localhost:5432/test_db mocha 'test/**/*.test.js' --timeout 10000 --recursive",
+    "migrate": "node scripts/run-migrations.js",
     "test:unit": "NODE_ENV=test DATABASE_URL=postgresql://test@localhost:5432/test_db mocha 'test/services/*.test.js' --timeout 5000",
     "test:coverage": "NODE_ENV=test DATABASE_URL=postgresql://test@localhost:5432/test_db nyc mocha 'test/**/*.test.js' --timeout 10000 --recursive"
   },
