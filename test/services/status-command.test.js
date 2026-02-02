@@ -59,7 +59,7 @@ describe("TelegramBotHandler", () => {
 ✅ <b>Subscription Status: Active</b>
 
 <b>Subscribed since:</b> ${new Date(
-        mockSubscriber.subscribed_at
+        mockSubscriber.subscribed_at,
       ).toLocaleDateString()}
 <b>Tier:</b> Free Tier
 <b>Signals: Receiving FREE trading signals 🚀</b>
@@ -88,10 +88,39 @@ Use /stop to unsubscribe at any time.
 ✅ <b>Subscription Status: Active</b>
 
 <b>Subscribed since:</b> ${new Date(
-        mockSubscriber.subscribed_at
+        mockSubscriber.subscribed_at,
       ).toLocaleDateString()}
 <b>Tier:</b> Premium Tier
 <b>Signals: Receiving PREMIUM trading signals 🌟</b>
+Use /stop to unsubscribe at any time.
+        `;
+
+      expect(botMock.sendMessage).to.have.been.calledWith(
+        "123",
+        expectedMessage,
+        { parse_mode: "HTML" },
+      );
+    });
+
+    it("should show pro tier status for pro user", async () => {
+      const mockSubscriber = {
+        subscribed: true,
+        subscribed_at: new Date(),
+        tier: "pro",
+      };
+      subscriberServiceMock.getSubscriber.resolves(mockSubscriber);
+
+      const statusCallback = botMock.onText.getCall(2).args[1];
+      await statusCallback({ chat: { id: "123" } });
+
+      const expectedMessage = `
+✅ <b>Subscription Status: Active</b>
+
+<b>Subscribed since:</b> ${new Date(
+        mockSubscriber.subscribed_at,
+      ).toLocaleDateString()}
+<b>Tier:</b> Pro Tier
+<b>Signals: Receiving PRO trading signals 🌟</b>
 Use /stop to unsubscribe at any time.
         `;
 

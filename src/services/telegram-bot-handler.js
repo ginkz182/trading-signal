@@ -90,10 +90,14 @@ You will receive all trading signals as they become available! 📊
           return;
         }
 
-        const tierMessage =
-          subscriber.tier === "free"
-            ? "Signals: Receiving FREE trading signals 🚀"
-            : "Signals: Receiving PREMIUM trading signals 🌟";
+        const tierName = subscriber.tier || "free";
+        const tierConfig = config.tiers[tierName] ? tierName : "free";
+        const capitalizedTier =
+          tierConfig.charAt(0).toUpperCase() + tierConfig.slice(1);
+
+        const tierMessage = `Signals: Receiving ${tierConfig.toUpperCase()} trading signals ${
+          tierConfig === "free" ? "🚀" : "🌟"
+        }`;
 
         const subscribedDate = subscriber.subscribed_at
           ? subscriber.subscribed_at.toLocaleDateString()
@@ -103,7 +107,7 @@ You will receive all trading signals as they become available! 📊
 ✅ <b>Subscription Status: Active</b>
 
 <b>Subscribed since:</b> ${subscribedDate}
-<b>Tier:</b> ${subscriber.tier === "free" ? "Free Tier" : "Premium Tier"}
+<b>Tier:</b> ${capitalizedTier} Tier
 <b>${tierMessage}</b>
 Use /stop to unsubscribe at any time.
         `;

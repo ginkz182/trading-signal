@@ -209,6 +209,21 @@ describe("SubscriberService", () => {
 
       expect(result).to.be.null;
     });
+
+    it("should default tier to 'free' if it is null", async () => {
+      const mockUser = {
+        chat_id: "chat123",
+        subscribed: true,
+        username: "testuser",
+        tier: null,
+      };
+
+      queryStub.resolves({ rows: [mockUser] });
+
+      const result = await subscriberService.getSubscriber("chat123");
+
+      expect(result.tier).to.equal("free");
+    });
   });
 
   describe("getActiveSubscribers()", () => {

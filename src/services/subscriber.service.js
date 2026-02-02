@@ -122,7 +122,16 @@ class SubscriberService {
       "SELECT * FROM subscribers WHERE chat_id = $1",
       [chatId]
     );
-    return result.rows[0] || null;
+
+    if (result.rows.length > 0) {
+      const subscriber = result.rows[0];
+      if (!subscriber.tier) {
+        subscriber.tier = "free";
+      }
+      return subscriber;
+    }
+
+    return null;
   }
 
   async getActiveSubscribers() {
