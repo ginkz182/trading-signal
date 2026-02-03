@@ -1,8 +1,7 @@
-
-const { Client } = require('pg');
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
+const { Client } = require("pg");
+const fs = require("fs");
+const path = require("path");
+require("dotenv").config();
 
 const runMigrations = async () => {
   const client = new Client({
@@ -11,26 +10,29 @@ const runMigrations = async () => {
 
   try {
     await client.connect();
-    console.log('Connected to the database.');
+    console.log("Connected to the database. " + process.env.DATABASE_URL);
 
-    const migrationsDir = path.join(__dirname, '../migrations');
+    const migrationsDir = path.join(__dirname, "../migrations");
     const migrationFiles = fs.readdirSync(migrationsDir).sort();
 
     for (const file of migrationFiles) {
-      if (file.endsWith('.sql')) {
+      if (file.endsWith(".sql")) {
         console.log(`Running migration: ${file}`);
-        const migration = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+        const migration = fs.readFileSync(
+          path.join(migrationsDir, file),
+          "utf8",
+        );
         await client.query(migration);
         console.log(`Migration ${file} completed.`);
       }
     }
 
-    console.log('All migrations run successfully.');
+    console.log("All migrations run successfully.");
   } catch (err) {
-    console.error('Error running migrations:', err);
+    console.error("Error running migrations:", err);
   } finally {
     await client.end();
-    console.log('Database connection closed.');
+    console.log("Database connection closed.");
   }
 };
 

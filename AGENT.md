@@ -1,21 +1,73 @@
-# Project: Crypto & Stock Trading Signal Bot
+# Project: Purrrfect Signal (by Five Cats Tech)
+
 **Brand:** Five Cats Tech (Utility Apps & Tools)
-**Target Audience:** Busy investors / Swing traders.
-**Strategy:** Trend-following (e.g., CDC Action Zone).
+**Target Audience:** Busy investors / Swing traders (Not day traders).
+**Strategy:** Trend-following (CDC Action Zone / EMA 12, 26 Crossover).
+**Tone:** Witty, feline-inspired, professional, and helpful.
 
-## Technical Context
-- **Stack:** Node.js, VS Code, PostgreSQL (`pg` library).
-- **Core Files:** `app.js`, `src/config.js`, `src/services/subscriber.service.js`, `src/services/monitor.service.js`.
-- **Architecture:** 
-    - **Override Model:** Premium users inherit `config.js` defaults until their first customization, which then persists a unique list to `user_assets`.
-    - **Monitoring:** Admin alerts via `ADMIN_CHAT_ID` for all user lifecycle events.
+---
 
-## Engineering Standards (Mandatory)
-- **Clean & Testable:** Maintain strict separation of concerns. Use Dependency Injection for DB and Bot instances.
+## 🛠 Technical Stack & Context
+- **Runtime:** Node.js >=18.0.0 (npm >=8.0.0).
+- **Database:** PostgreSQL (`pg` library) for subscriber and asset management.
+- **APIs:** `ccxt` (Crypto), `yahoo-finance2` (Stocks), `node-telegram-bot-api`.
+- **Logic:** `technicalindicators` (EMA calculations), `node-cron` (Scheduling).
+
+### Core Components
+- **SignalCalculator** (`src/core/SignalCalculator.js`): Main orchestrator that coordinates all services and scheduled scans.
+- **MarketDataProcessor** (`src/core/MarketDataProcessor.js`): Handles data validation, windowing (150-point), and prep for analysis.
+- **ExchangeServicePool** (`src/services/data/ExchangeServicePool.js`): Manages service pooling (KuCoin, Yahoo Finance) for memory efficiency.
+- **IndicatorManager** (`src/managers/indicator.manager.js`): Specifically calculates the 12/26 EMA strategy signals.
+- **SubscriberService** (`src/services/subscriber.service.js`): Manages user tiers, custom asset overrides, and DB persistence.
+
+---
+
+## 🏗 Architecture: The Override Model
+- **Override Logic:** - **Free Users:** Inherit `config.js` default assets only.
+    - **Premium/Ultimate Users:** Inherit `config.js` defaults initially. Upon using `/subscribe` or `/unsubscribe`, a unique list is persisted to the `user_assets` table. Once custom assets exist, the global config defaults are ignored for that specific user.
+- **Monitoring:** `monitor.service.js` sends real-time alerts to `ADMIN_CHAT_ID` for registration, tier changes, and validation failures.
+- **Data Flow:** Cron (00:05) -> ExchangeServicePool (Fetch) -> MarketDataProcessor (Window) -> IndicatorManager (Analyze) -> NotificationService (Dispatch).
+
+---
+
+## 💎 Tier Definitions
+1. **Purrrfect Standard (Free):** 1D timeframe, default assets.
+2. **Purrrfect Pro (Premium):** 1D timeframe, custom asset selection (`/subscribe`), real-time notifications (0:05).
+3. **Purrrfect Ultimate (The Fat Cat):** Custom timeframes (1h, 4h), API access, priority support.
+
+---
+
+## 🚥 Engineering Standards (Mandatory)
+- **Clean & Testable:** Maintain strict separation of concerns. Use Dependency Injection for DB and Bot instances to allow easy mocking.
 - **TDD Mentality:** Always write a test whenever adding a new feature or updating logic. No PR is complete without corresponding test updates.
-- **Error Handling:** Use a "Request Support" flow when assets are not found in external APIs.
+- **Context Hygiene:** Exclude `node_modules`, `dist`, and `.env` from AI assistant context to ensure precise code generation.
+- **Error Handling:** Use a "Request Support" flow when assets are not found in external APIs; notify admin of missing asset requests.
 
-## Tier Definitions
-1. **Free:** 1D timeframe, default assets.
-2. **Premium:** 1D timeframe, custom asset selection (`/subscribe`), real-time (0:05).
-3. **Super Premium:** Custom timeframes (1h, 4h, etc.), API access.
+---
+
+## 💻 Development Commands
+
+### Testing
+- `npm test` - Run all tests (Mocha, 10s timeout).
+- `npm run test:unit` - Run unit tests only (services/managers).
+- `npm run test:coverage` - Run tests with coverage reporting via `nyc`.
+
+### Execution
+- `npm start` - Start production server (`app.js`).
+- `npm run dev` - Start development server with `nodemon`.
+- **Default Port:** 3000 (or `PORT` env var).
+
+### Internal API Endpoints (Express)
+- `GET /` - Health check and status.
+- `GET /stats` - Subscriber and system statistics.
+- `POST /trigger-scan` - Manual signal scan trigger.
+- `GET /memory` - Memory usage analytics.
+- `GET /performance` - Performance and processing summary.
+
+---
+
+## 📝 Ongoing TODOs
+- [ ] Implement `user_assets` table migration (id, chat_id, asset_symbol).
+- [ ] Add `/subscribe <symbol>` and `/unsubscribe <symbol>` command handlers.
+- [ ] Implement `syncDefaultAssets` logic for first-time premium customization.
+- [ ] Add `monitor.service.js` to track user growth and custom asset requests.

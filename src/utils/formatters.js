@@ -8,7 +8,7 @@ const dayjs = require("dayjs");
  * Symbol display name mapping for better readability
  */
 const SYMBOL_DISPLAY_NAMES = {
-  'GC=F': 'GOLD',
+  "GC=F": "GOLD",
   // Add more mappings as needed
 };
 
@@ -32,7 +32,7 @@ function formatSignals(signals, options = {}) {
   const { signalSource = "CURRENT" } = options;
 
   let message = `🔔<b> CDC ACTION ZONE ALERT</b> 🔔\n🗓️ ${dayjs().format(
-    "D MMM"
+    "D MMM",
   )}\n`;
 
   // Add signal source indicator if provided
@@ -119,6 +119,9 @@ function formatSignals(signals, options = {}) {
       */
     }
   }
+
+  message +=
+    "\n\n<i>💡 Disclaimer: All signals are for educational purposes only. Trade at your own risk. Past performance does not guarantee future profits.</i>";
 
   return message;
 }
