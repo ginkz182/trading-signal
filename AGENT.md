@@ -30,10 +30,10 @@
 
 ---
 
-## 💎 Tier Definitions
-1. **Purrrfect Standard (Free):** 1D timeframe, default assets.
-2. **Purrrfect Pro (Premium):** 1D timeframe, custom asset selection (`/subscribe`), real-time notifications (0:05).
-3. **Purrrfect Ultimate (The Fat Cat):** Custom timeframes (1h, 4h), API access, priority support.
+## 💎 Tier Definitions (The Feline Hierarchy)
+1. **Purrrfect Stray (Free):** 1D timeframe, default assets. Just roaming the market.
+2. **Purrrfect Resident (Premium):** 1D timeframe, custom asset selection. Your own territory.
+3. **The Alpha Purr (Pro):** Custom timeframes, etc (this will be for later phase)
 
 ---
 

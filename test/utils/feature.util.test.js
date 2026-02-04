@@ -1,4 +1,3 @@
-
 const { expect } = require("chai");
 const { hasFeature } = require("../../src/utils/feature.util");
 
@@ -6,7 +5,7 @@ describe("Feature Util", () => {
   describe("hasFeature", () => {
     // Test cases for 'assets' feature
     it("should return true for free tier with allowed number of assets", () => {
-      expect(hasFeature("free", "assets", 5)).to.be.true;
+      expect(hasFeature("free", "assets", 0)).to.be.true;
     });
 
     it("should return false for free tier with more than allowed assets", () => {
@@ -32,10 +31,10 @@ describe("Feature Util", () => {
 
     it("should return true for premium tier with allowed timeframes", () => {
       expect(hasFeature("premium", "timeframes", "1d")).to.be.true;
-      expect(hasFeature("premium", "timeframes", "4h")).to.be.true;
     });
 
     it("should return false for premium tier with disallowed timeframe", () => {
+      expect(hasFeature("premium", "timeframes", "4h")).to.be.false;
       expect(hasFeature("premium", "timeframes", "1h")).to.be.false;
     });
 

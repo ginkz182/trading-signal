@@ -10,7 +10,7 @@ const MarketDataProcessor = require("./MarketDataProcessor"); // NEW
 const config = require("../config");
 
 class SignalCalculator {
-  constructor(configOverride = {}) {
+  constructor(configOverride = {}, notificationService) {
     this.config = { ...config, ...configOverride };
 
     // Initialize core components
@@ -19,12 +19,7 @@ class SignalCalculator {
     this.memoryMonitor = new MemoryMonitor();
 
     // Initialize business logic components
-    this.notificationService = new NotificationService({
-      telegramToken: process.env.TELEGRAM_BOT_TOKEN,
-      subscriberConfig: {
-        databaseUrl: process.env.DATABASE_URL,
-      },
-    });
+    this.notificationService = notificationService;
 
     this.indicatorManager = new IndicatorManager({
       fastPeriod: this.config.fastPeriod || 12,

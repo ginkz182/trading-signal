@@ -4,6 +4,9 @@ const express = require("express");
 const cron = require("node-cron");
 const SignalCalculator = require("./src/core/SignalCalculator");
 const TelegramBotHandler = require("./src/services/telegram-bot-handler");
+const NotificationService = require("./src/services/notification.service");
+const SubscriberService = require("./src/services/subscriber.service");
+const MonitorService = require("./src/services/monitor.service");
 const config = require("./src/config");
 
 const app = express();
@@ -29,29 +32,42 @@ app.get("/health", (req, res) => {
 // Global variables for services
 let signalCalculator;
 let botHandler;
+let notificationService;
+let subscriberService;
+let monitorService;
 
 // Initialize all services
 async function initializeServices() {
   try {
     console.log("🔧 Initializing services...");
 
+    // Core services
+    subscriberService = new SubscriberService({
+      databaseUrl: process.env.DATABASE_URL,
+    });
+    await subscriberService.initialize();
+
+    notificationService = new NotificationService({
+      telegramToken: process.env.TELEGRAM_BOT_TOKEN,
+      subscriberService: subscriberService,
+    });
+
+    monitorService = new MonitorService(
+      notificationService,
+      process.env.ADMIN_CHAT_ID,
+    );
+
     // Initialize Signal Calculator with Railway-optimized config
-    signalCalculator = new SignalCalculator(config);
+    signalCalculator = new SignalCalculator(config, notificationService);
 
     // Initialize Telegram Bot Handler
     botHandler = new TelegramBotHandler({
       token: process.env.TELEGRAM_BOT_TOKEN,
-      subscriberConfig: {
-        databaseUrl: process.env.DATABASE_URL,
-      },
+      subscriberService: subscriberService,
+      monitorService: monitorService,
     });
 
     console.log("✅ All services initialized successfully");
-
-    // Run initial signal check - skip for now. we already add manual trigger endpoint
-    // console.log("🔍 Running initial signal check...");
-    // await signalCalculator.scan({ sendNotification: false });
-    // console.log("✅ Initial check completed");
   } catch (error) {
     console.error("❌ Error initializing services:", error);
     // Don't exit in production, let Railway restart the app
@@ -65,10 +81,11 @@ async function initializeServices() {
 cron.schedule(
   "5 0 * * *",
   async () => {
+    const jobName = "Daily Signal Scan";
     console.log(
       "⏰ [" +
         new Date().toISOString() +
-        "] Scheduled signal check starting...",
+        `] Scheduled signal check starting...`,
     );
     try {
       const result = await signalCalculator.scan();
@@ -77,8 +94,14 @@ cron.schedule(
       } else {
         console.log("📈 No signals detected");
       }
+      if (monitorService) {
+        await monitorService.notifyCronRunStatus(true, jobName);
+      }
     } catch (error) {
       console.error("❌ Error in scheduled signal check:", error);
+      if (monitorService) {
+        await monitorService.notifyCronRunStatus(false, jobName, error);
+      }
     }
   },
   {

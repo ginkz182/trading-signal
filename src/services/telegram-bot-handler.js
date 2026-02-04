@@ -2,12 +2,11 @@
  * TelegramBotHandler - Simple version with basic commands
  */
 const TelegramBot = require("node-telegram-bot-api");
-const SubscriberService = require("./subscriber.service");
 const config = require("../config");
 
 class TelegramBotHandler {
-  constructor(config = {}) {
-    this.bot = new TelegramBot(config.token, {
+  constructor({ token, subscriberService, monitorService }) {
+    this.bot = new TelegramBot(token, {
       polling: {
         interval: 1000, // Poll every 1 second (default is 300ms)
         autoStart: true,
@@ -16,7 +15,8 @@ class TelegramBotHandler {
         },
       },
     });
-    this.subscriberService = new SubscriberService(config.subscriberConfig);
+    this.subscriberService = subscriberService;
+    this.monitorService = monitorService;
     this.setupCommands();
     this.setupErrorHandling();
   }
@@ -29,9 +29,13 @@ class TelegramBotHandler {
 
       try {
         await this.subscriberService.subscribe(chatId, userInfo);
+        
+        // Notify admin about new user
+        if (this.monitorService) {
+          await this.monitorService.notifyNewUser(userInfo);
+        }
 
-        const welcomeMessage = `
-🚀 <b>Welcome to Trading Signals!</b>
+        const welcomeMessage = `🚀 <b>Welcome to Trading Signals!</b>
 
 You are now subscribed to receive FREE trading signals.
 
@@ -41,8 +45,7 @@ You are now subscribed to receive FREE trading signals.
 /assetlist - See the full list of assets we're tracking
 /help - Show help message
 
-You will receive all trading signals as they become available! 📊
-        `;
+You will receive all trading signals as they become available! 📊`;
 
         await this.bot.sendMessage(chatId, welcomeMessage, {
           parse_mode: "HTML",
@@ -91,26 +94,19 @@ You will receive all trading signals as they become available! 📊
         }
 
         const tierName = subscriber.tier || "free";
-        const tierConfig = config.tiers[tierName] ? tierName : "free";
-        const capitalizedTier =
-          tierConfig.charAt(0).toUpperCase() + tierConfig.slice(1);
-
-        const tierMessage = `Signals: Receiving ${tierConfig.toUpperCase()} trading signals ${
-          tierConfig === "free" ? "🚀" : "🌟"
-        }`;
+        const tierConfig = config.tiers[tierName];
+        const tierDisplayName =
+          tierConfig?.displayName.toUpperCase() || tierName.toUpperCase();
 
         const subscribedDate = subscriber.subscribed_at
           ? subscriber.subscribed_at.toLocaleDateString()
           : "Not available";
 
-        const statusMessage = `
-✅ <b>Subscription Status: Active</b>
+        const statusMessage = `✅ <b>Subscription Status: Active</b>
 
 <b>Subscribed since:</b> ${subscribedDate}
-<b>Tier:</b> ${capitalizedTier} Tier
-<b>${tierMessage}</b>
-Use /stop to unsubscribe at any time.
-        `;
+<b>Tier:</b> ${tierDisplayName}
+Use /stop to unsubscribe at any time.`;
 
         await this.bot.sendMessage(chatId, statusMessage, {
           parse_mode: "HTML",
@@ -126,8 +122,7 @@ Use /stop to unsubscribe at any time.
 
     // Help command
     this.bot.onText(/\/help/, async (msg) => {
-      const helpMessage = `
-<b>🤖 Trading Signals Bot Commands</b>
+      const helpMessage = `<b>🤖 Trading Signals Bot Commands</b>
 
 <b>Subscription:</b>
 /start - Subscribe to trading signals
@@ -139,8 +134,7 @@ Use /stop to unsubscribe at any time.
 <b>About:</b>
 This bot sends you real-time trading signals for both cryptocurrency and stock markets. All signals are based on EMA crossover analysis.
 
-Use /start to begin receiving signals! 🚀
-      `;
+Use /start to begin receiving signals! 🚀`;
 
       await this.bot.sendMessage(msg.chat.id, helpMessage, {
         parse_mode: "HTML",
@@ -152,15 +146,13 @@ Use /start to begin receiving signals! 🚀
       const cryptoAssets = config.symbols.join("\n");
       const stockAssets = config.stockSymbols.join("\n");
 
-      const assetListMessage = `
-<b>Current Asset List</b>
+      const assetListMessage = `<b>Current Asset List</b>
 
 <b>Crypto Assets:</b>
 ${cryptoAssets}
 
 <b>Stock Assets:</b>
-${stockAssets}
-      `;
+${stockAssets}`;
 
       await this.bot.sendMessage(msg.chat.id, assetListMessage, {
         parse_mode: "HTML",

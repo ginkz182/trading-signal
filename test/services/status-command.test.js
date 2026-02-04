@@ -10,6 +10,7 @@ describe("TelegramBotHandler", () => {
   let TelegramBotHandler;
   let botMock;
   let subscriberServiceMock;
+  let monitorServiceMock;
   let handler;
 
   beforeEach(() => {
@@ -21,6 +22,10 @@ describe("TelegramBotHandler", () => {
 
     subscriberServiceMock = {
       getSubscriber: sinon.stub(),
+    };
+
+    monitorServiceMock = {
+        notifyNewUser: sinon.stub(),
     };
 
     const TelegramBot = sinon.stub().returns(botMock);
@@ -35,7 +40,8 @@ describe("TelegramBotHandler", () => {
 
     handler = new TelegramBotHandler({
       token: "fake-token",
-      subscriberConfig: { databaseUrl: "fake-url" },
+      subscriberService: subscriberServiceMock,
+      monitorService: monitorServiceMock,
     });
   });
 
@@ -55,22 +61,23 @@ describe("TelegramBotHandler", () => {
       const statusCallback = botMock.onText.getCall(2).args[1];
       await statusCallback({ chat: { id: "123" } });
 
-      const expectedMessage = `
-✅ <b>Subscription Status: Active</b>
+      const tierConfig = require("../../src/config").tiers[mockSubscriber.tier];
+      const tierDisplayName = tierConfig?.displayName.toUpperCase() || mockSubscriber.tier.toUpperCase();
+
+      const expectedMessage = `✅ <b>Subscription Status: Active</b>
 
 <b>Subscribed since:</b> ${new Date(
         mockSubscriber.subscribed_at,
       ).toLocaleDateString()}
-<b>Tier:</b> Free Tier
-<b>Signals: Receiving FREE trading signals 🚀</b>
-Use /stop to unsubscribe at any time.
-        `;
+<b>Tier:</b> ${tierDisplayName}
+Use /stop to unsubscribe at any time.`;
 
       expect(botMock.sendMessage).to.have.been.calledWith(
         "123",
         expectedMessage,
         { parse_mode: "HTML" },
       );
+
     });
 
     it("should show premium tier status for premium user", async () => {
@@ -83,17 +90,17 @@ Use /stop to unsubscribe at any time.
 
       const statusCallback = botMock.onText.getCall(2).args[1];
       await statusCallback({ chat: { id: "123" } });
+      
+      const tierConfig = require("../../src/config").tiers[mockSubscriber.tier];
+      const tierDisplayName = tierConfig?.displayName.toUpperCase() || mockSubscriber.tier.toUpperCase();
 
-      const expectedMessage = `
-✅ <b>Subscription Status: Active</b>
+      const expectedMessage = `✅ <b>Subscription Status: Active</b>
 
 <b>Subscribed since:</b> ${new Date(
         mockSubscriber.subscribed_at,
       ).toLocaleDateString()}
-<b>Tier:</b> Premium Tier
-<b>Signals: Receiving PREMIUM trading signals 🌟</b>
-Use /stop to unsubscribe at any time.
-        `;
+<b>Tier:</b> ${tierDisplayName}
+Use /stop to unsubscribe at any time.`;
 
       expect(botMock.sendMessage).to.have.been.calledWith(
         "123",
@@ -113,16 +120,16 @@ Use /stop to unsubscribe at any time.
       const statusCallback = botMock.onText.getCall(2).args[1];
       await statusCallback({ chat: { id: "123" } });
 
-      const expectedMessage = `
-✅ <b>Subscription Status: Active</b>
+      const tierConfig = require("../../src/config").tiers[mockSubscriber.tier];
+      const tierDisplayName = tierConfig?.displayName.toUpperCase() || mockSubscriber.tier.toUpperCase();
+
+      const expectedMessage = `✅ <b>Subscription Status: Active</b>
 
 <b>Subscribed since:</b> ${new Date(
         mockSubscriber.subscribed_at,
       ).toLocaleDateString()}
-<b>Tier:</b> Pro Tier
-<b>Signals: Receiving PRO trading signals 🌟</b>
-Use /stop to unsubscribe at any time.
-        `;
+<b>Tier:</b> ${tierDisplayName}
+Use /stop to unsubscribe at any time.`;
 
       expect(botMock.sendMessage).to.have.been.calledWith(
         "123",

@@ -7,14 +7,8 @@ describe("TelegramBotHandler", () => {
   let botHandler;
   let telegramBotStub;
   let subscriberServiceStub;
+  let monitorServiceStub;
   let TelegramBotHandler;
-
-  const mockConfig = {
-    token: "mock-telegram-token",
-    subscriberConfig: {
-      databaseUrl: "postgresql://test@localhost:5432/test",
-    },
-  };
 
   beforeEach(() => {
     // Create a mock bot instance with all required methods
@@ -34,14 +28,15 @@ describe("TelegramBotHandler", () => {
       getSubscriber: sinon.stub().resolves(),
       initialize: sinon.stub().resolves(),
     };
-
-    // Mock SubscriberService constructor
-    const SubscriberServiceMock = sinon.stub().returns(subscriberServiceStub);
+    
+    monitorServiceStub = {
+      notifyNewUser: sinon.stub().resolves(),
+    };
 
     // Use proxyquire to inject our mocks
     TelegramBotHandler = proxyquire("../../src/services/telegram-bot-handler", {
       "node-telegram-bot-api": TelegramBotMock,
-      "./subscriber.service": SubscriberServiceMock,
+      "./subscriber.service": sinon.stub().returns(subscriberServiceStub),
       "../config": {
         symbols: ["BTC/USDT", "ETH/USDT"],
         stockSymbols: ["NVDA", "TSLA"],
@@ -52,7 +47,11 @@ describe("TelegramBotHandler", () => {
     sinon.stub(console, "error");
     sinon.stub(console, "log");
 
-    botHandler = new TelegramBotHandler(mockConfig);
+    botHandler = new TelegramBotHandler({
+      token: "mock-telegram-token",
+      subscriberService: subscriberServiceStub,
+      monitorService: monitorServiceStub,
+    });
   });
 
   afterEach(() => {
@@ -60,9 +59,10 @@ describe("TelegramBotHandler", () => {
   });
 
   describe("constructor", () => {
-    it("should initialize bot and subscriber service", () => {
+    it("should initialize bot, subscriber service and monitor service", () => {
       expect(botHandler.bot).to.exist;
       expect(botHandler.subscriberService).to.exist;
+      expect(botHandler.monitorService).to.exist;
     });
 
     it("should set up command handlers", () => {
@@ -85,7 +85,7 @@ describe("TelegramBotHandler", () => {
   });
 
   describe("start command", () => {
-    it("should subscribe user on /start command", async () => {
+    it("should subscribe user on /start command and notify admin", async () => {
       // Find the start command handler
       const startCall = telegramBotStub.onText
         .getCalls()
@@ -111,6 +111,8 @@ describe("TelegramBotHandler", () => {
       expect(subscriberServiceStub.subscribe.calledOnce).to.be.true;
       expect(subscriberServiceStub.subscribe.calledWith("123456", mockMsg.from))
         .to.be.true;
+      expect(monitorServiceStub.notifyNewUser.calledOnce).to.be.true;
+      expect(monitorServiceStub.notifyNewUser.calledWith(mockMsg.from)).to.be.true;
       expect(telegramBotStub.sendMessage.calledOnce).to.be.true;
 
       // Check welcome message content

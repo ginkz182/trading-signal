@@ -29,14 +29,17 @@ const config = {
   timeframe: "1d",
   tiers: {
     free: {
-      assets: 5,
+      displayName: "Stray",
+      assets: 0,
       timeframes: ["1d"],
     },
     premium: {
+      displayName: "Resident",
       assets: "all",
-      timeframes: ["1d", "4h"],
+      timeframes: ["1d"],
     },
     pro: {
+      displayName: "The Alpha",
       assets: "all",
       timeframes: ["1d", "4h", "1h"],
     },
