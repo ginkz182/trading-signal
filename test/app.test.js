@@ -119,6 +119,9 @@ describe("App Integration Tests (Optimized)", () => {
     // Mock the global variables that would be set in the real app
     global.signalCalculator = signalCalculatorStub;
     global.botHandler = botHandlerStub;
+    global.monitorService = {
+      notifyCronRunStatus: sinon.stub(),
+    };
 
     // Set up all the routes from your optimized app
     setupAppRoutes();
@@ -352,7 +355,7 @@ describe("App Integration Tests (Optimized)", () => {
 
       expect(response.status).to.equal(200);
       expect(response.body.message).to.include(
-        "Trading Signals Bot is running"
+        "Trading Signals Bot is running",
       );
       expect(response.body.status).to.equal("healthy");
       expect(response.body.timestamp).to.exist;
@@ -415,7 +418,7 @@ describe("App Integration Tests (Optimized)", () => {
       expect(response.body.freedMB).to.equal(5);
       expect(response.body.newAnalysis).to.exist;
       expect(
-        signalCalculatorStub.memoryMonitor.forceGarbageCollection.calledOnce
+        signalCalculatorStub.memoryMonitor.forceGarbageCollection.calledOnce,
       ).to.be.true;
     });
   });
@@ -467,7 +470,7 @@ describe("App Integration Tests (Optimized)", () => {
 
       expect(response.status).to.equal(200);
       expect(response.body.message).to.equal(
-        "Data processing statistics reset"
+        "Data processing statistics reset",
       );
       expect(signalCalculatorStub.dataProcessor.resetStats.calledOnce).to.be
         .true;

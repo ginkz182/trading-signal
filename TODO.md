@@ -1,8 +1,8 @@
 # TODO: Premium Subscriptions & Admin Monitoring (Five Cats Tech)
 
 ## Phase 0: Monitoring & Observability
-- [ ] Add `ADMIN_CHAT_ID` to `.env`.
-- [ ] Create `src/services/monitor.service.js` (Methods: `notifyNewUser`, `notifySubscriptionChange`).
+- [x] Add `ADMIN_CHAT_ID` to `.env`.
+- [x] Create `src/services/monitor.service.js` (Methods: `notifyNewUser`, `notifySubscriptionChange`).
 - [ ] Implement alerts for validation failures (e.g., user tries to subscribe to an unsupported asset).
 
 ## Phase 1: Database & Persistence

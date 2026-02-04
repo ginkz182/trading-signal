@@ -36,6 +36,31 @@ let notificationService;
 let subscriberService;
 let monitorService;
 
+async function runCronJob() {
+  const jobName = "Daily Signal Scan";
+  console.log(
+    "⏰ [" + new Date().toISOString() + "] Scheduled signal check starting...",
+  );
+  try {
+    const result = await signalCalculator.scan();
+    if (result.message) {
+      console.log("📊 Signals found and sent to subscribers");
+    } else {
+      console.log("📈 No signals detected");
+    }
+    if (monitorService) {
+      await monitorService.notifyCronRunStatus(true, jobName);
+    }
+    return { success: true, result };
+  } catch (error) {
+    console.error("❌ Error in scheduled signal check:", error);
+    if (monitorService) {
+      await monitorService.notifyCronRunStatus(false, jobName, error);
+    }
+    return { success: false, error };
+  }
+}
+
 // Initialize all services
 async function initializeServices() {
   try {
@@ -81,28 +106,7 @@ async function initializeServices() {
 cron.schedule(
   "5 0 * * *",
   async () => {
-    const jobName = "Daily Signal Scan";
-    console.log(
-      "⏰ [" +
-        new Date().toISOString() +
-        `] Scheduled signal check starting...`,
-    );
-    try {
-      const result = await signalCalculator.scan();
-      if (result.message) {
-        console.log("📊 Signals found and sent to subscribers");
-      } else {
-        console.log("📈 No signals detected");
-      }
-      if (monitorService) {
-        await monitorService.notifyCronRunStatus(true, jobName);
-      }
-    } catch (error) {
-      console.error("❌ Error in scheduled signal check:", error);
-      if (monitorService) {
-        await monitorService.notifyCronRunStatus(false, jobName, error);
-      }
-    }
+    await runCronJob();
   },
   {
     timezone: "UTC",
