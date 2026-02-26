@@ -18,7 +18,7 @@ class MonitorService {
     if (!this.adminChatId) return;
 
     const message = `
-      <strong>New User Alert</strong>
+      <strong>ADMIN NOTIFY: New User Alert</strong>
       <pre>
       ID: ${user.id}
       Name: ${user.first_name} ${user.last_name || ""}
@@ -75,6 +75,37 @@ class MonitorService {
         ${error && error.stack ? `<pre>${error.stack}</pre>` : ""}
       `;
     }
+    await this.notificationService.sendToSingleChat(this.adminChatId, message.trim());
+  }
+
+  /**
+   * Notifies about a successful payment or renewal.
+   */
+  async notifyPaymentSuccess(chatId, amount, currency, planType) {
+    if (!this.adminChatId) return;
+    const message = `
+      <strong>ADMIN NOTIFY: Payment Success</strong>
+      <pre>
+      Chat ID: ${chatId}
+      Plan: ${planType}
+      Amount: ${amount} ${currency.toUpperCase()}
+      </pre>
+    `;
+    await this.notificationService.sendToSingleChat(this.adminChatId, message.trim());
+  }
+
+  /**
+   * Notifies when a user cancels their subscription.
+   */
+  async notifySubscriptionCancelled(chatId, reason) {
+    if (!this.adminChatId) return;
+    const message = `
+      <strong>ADMIN NOTIFY: Subscription Cancelled</strong>
+      <pre>
+      Chat ID: ${chatId}
+      Reason: ${reason}
+      </pre>
+    `;
     await this.notificationService.sendToSingleChat(this.adminChatId, message.trim());
   }
 }

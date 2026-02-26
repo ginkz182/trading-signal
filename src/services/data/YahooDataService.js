@@ -90,9 +90,75 @@ class YahooFinanceService {
     return null; // Should not be reached if loop is correct
   }
 
+  /**
+   * Fetch historical daily OHLCV data for backtesting.
+   * Matches the output format of BinanceService.getHistoricalPrices
+   * @param {string} symbol - e.g. "AAPL"
+   * @param {number} limit - Number of daily candles to fetch
+   * @returns {Array|null} Array of {time, open, high, low, close, volume} or null on error
+   */
+  async getHistoricalPrices(symbol, limit = 500) {
+    try {
+      const endDate = new Date();
+      // Calculate start date based on requested limit (+ buffer for weekends/holidays)
+      const bufferDays = Math.ceil(limit * 1.5);
+      const startDate = dayjs().subtract(bufferDays, "day").toDate();
+
+      const result = await this.yahooFinance.chart(symbol, {
+        period1: startDate,
+        period2: endDate,
+        interval: this.timeframe || '1d',
+        includePrePost: false,
+      });
+
+      if (!result || !result.quotes || !result.quotes.length) {
+        throw new Error(`No data found for ${symbol}`);
+      }
+
+      // Format to match Binance OHLCV
+      const ohlcv = result.quotes.map(quote => ({
+        time: quote.date ? new Date(quote.date).getTime() : Date.now(),
+        open: quote.open,
+        high: quote.high,
+        low: quote.low,
+        close: quote.close,
+        volume: quote.volume,
+      }));
+
+      // Return exactly the requested number of candles (slice from the end)
+      return ohlcv.slice(-limit);
+    } catch (error) {
+      console.error(`Failed to fetch Yahoo historical prices for ${symbol}:`, error);
+      return null;
+    }
+  }
+
   clearCache() {
     // Yahoo doesn't cache data, so nothing to clear
     console.log(`[MEMORY] Yahoo cache cleared`);
+  }
+
+  async validateSymbol(symbol) {
+    try {
+      // Use quoteSummary for a lightweight check
+      const result = await this.yahooFinance.quoteSummary(symbol, { modules: ["price"] });
+      
+      if (!result || !result.price) return false;
+
+      const allowedTypes = ['EQUITY', 'ETF', 'FUTURE', 'INDEX', 'CURRENCY'];
+      const quoteType = result.price.quoteType;
+
+      // Filter out Mutual Funds and other noise
+      if (!allowedTypes.includes(quoteType)) {
+          console.log(`[YAHOO] Rejected ${symbol} (Type: ${quoteType})`);
+          return false;
+      }
+
+      return true;
+    } catch (error) {
+      // Yahoo finance throws if not found
+      return false;
+    }
   }
 
   cleanup() {

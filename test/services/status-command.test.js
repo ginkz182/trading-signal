@@ -2,6 +2,7 @@ const chai = require("chai");
 const sinon = require("sinon");
 const sinonChai = require("sinon-chai").default;
 const proxyquire = require("proxyquire");
+const dayjs = require("dayjs");
 
 const { expect } = chai;
 chai.use(sinonChai);
@@ -66,11 +67,10 @@ describe("TelegramBotHandler", () => {
 
       const expectedMessage = `✅ <b>Subscription Status: Active</b>
 
-<b>Subscribed since:</b> ${new Date(
-        mockSubscriber.subscribed_at,
-      ).toLocaleDateString()}
+<b>Subscribed since:</b> ${dayjs(mockSubscriber.subscribed_at).format('DD MMM YYYY')}
 <b>Tier:</b> ${tierDisplayName}
-Use /stop to unsubscribe at any time.`;
+
+Use /cancel to stop auto-renewal or /stop to unsubscribe (temporary pause notification).`;
 
       expect(botMock.sendMessage).to.have.been.calledWith(
         "123",
@@ -96,11 +96,12 @@ Use /stop to unsubscribe at any time.`;
 
       const expectedMessage = `✅ <b>Subscription Status: Active</b>
 
-<b>Subscribed since:</b> ${new Date(
-        mockSubscriber.subscribed_at,
-      ).toLocaleDateString()}
+<b>Subscribed since:</b> ${dayjs(mockSubscriber.subscribed_at).format('DD MMM YYYY')}
 <b>Tier:</b> ${tierDisplayName}
-Use /stop to unsubscribe at any time.`;
+<b>Expires:</b> Lifetime/Indefinite
+<b>Auto-Renew:</b> ❌ Manual (One-time/PromptPay)
+
+Use /cancel to stop auto-renewal or /stop to unsubscribe (temporary pause notification).`;
 
       expect(botMock.sendMessage).to.have.been.calledWith(
         "123",
@@ -125,11 +126,12 @@ Use /stop to unsubscribe at any time.`;
 
       const expectedMessage = `✅ <b>Subscription Status: Active</b>
 
-<b>Subscribed since:</b> ${new Date(
-        mockSubscriber.subscribed_at,
-      ).toLocaleDateString()}
+<b>Subscribed since:</b> ${dayjs(mockSubscriber.subscribed_at).format('DD MMM YYYY')}
 <b>Tier:</b> ${tierDisplayName}
-Use /stop to unsubscribe at any time.`;
+<b>Expires:</b> Lifetime/Indefinite
+<b>Auto-Renew:</b> ❌ Manual (One-time/PromptPay)
+
+Use /cancel to stop auto-renewal or /stop to unsubscribe (temporary pause notification).`;
 
       expect(botMock.sendMessage).to.have.been.calledWith(
         "123",

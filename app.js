@@ -5,12 +5,46 @@ const cron = require("node-cron");
 const SignalCalculator = require("./src/core/SignalCalculator");
 const TelegramBotHandler = require("./src/services/telegram-bot-handler");
 const NotificationService = require("./src/services/notification.service");
+const PaymentService = require("./src/services/payment.service");
 const SubscriberService = require("./src/services/subscriber.service");
 const MonitorService = require("./src/services/monitor.service");
+const createWebhookController = require("./src/controllers/webhook.controller");
 const config = require("./src/config");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize Payment Service early for Webhooks
+// Note: We need subscriberService, effectively we need to init it properly.
+// But `initializeServices` is async and called later. 
+// For webhooks to work *immediately* on startup, we might need a slight refactor 
+// or just init them here.
+// However, `app.js` structure inits services in `initializeServices`.
+// Let's keep the pattern but we need to declare variables globally.
+
+// Global variables for services
+let signalCalculator;
+let botHandler;
+let notificationService;
+let subscriberService;
+let monitorService;
+let paymentService;
+
+// --- Webhooks (Must be before express.json) ---
+// We need a temporary or lazy access to paymentService inside the route
+app.use('/api/webhooks', (req, res, next) => {
+    if (!paymentService) {
+        return res.status(503).send("Payment service not ready");
+    }
+    // Pass control to the actual router
+    next();
+}, (req, res, next) => {
+    // We create the router on the fly or reuse it? 
+    // Actually, `createWebhookController` returns a router.
+    // We can mount it, but it needs paymentService instance.
+    // Solution: Initialize services FIRST, or use a wrapper.
+    createWebhookController(paymentService)(req, res, next);
+});
 
 // Middleware
 app.use(express.json());
@@ -29,12 +63,30 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Global variables for services
-let signalCalculator;
-let botHandler;
-let notificationService;
-let subscriberService;
-let monitorService;
+// Payment result pages
+app.get("/payment/success", (req, res) => {
+  const botUsername = config.telegram.botUsername;
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Payment Successful</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#0f0f0f;color:#fff;}
+.card{text-align:center;padding:40px;border-radius:16px;background:#1a1a2e;max-width:400px;}
+h1{color:#4ade80;margin-bottom:8px;}a{display:inline-block;margin-top:20px;padding:12px 32px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;}
+a:hover{background:#1d4ed8;}</style></head>
+<body><div class="card"><h1>🎉 Payment Successful!</h1><p>Your subscription has been activated.</p>
+<a href="https://t.me/${botUsername}">Return to Bot</a></div></body></html>`);
+});
+
+app.get("/payment/cancel", (req, res) => {
+  const botUsername = config.telegram.botUsername;
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Payment Cancelled</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#0f0f0f;color:#fff;}
+.card{text-align:center;padding:40px;border-radius:16px;background:#1a1a2e;max-width:400px;}
+h1{margin-bottom:8px;}a{display:inline-block;margin-top:20px;padding:12px 32px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;}
+a:hover{background:#1d4ed8;}</style></head>
+<body><div class="card"><h1>Payment Cancelled</h1><p>No charges were made. You can try again anytime.</p>
+<a href="https://t.me/${botUsername}">Return to Bot</a></div></body></html>`);
+});
+
+
 
 async function runCronJob() {
   const jobName = "Daily Signal Scan";
@@ -85,11 +137,15 @@ async function initializeServices() {
     // Initialize Signal Calculator with Railway-optimized config
     signalCalculator = new SignalCalculator(config, notificationService);
 
+    // Initialize Payment Service
+    paymentService = new PaymentService(subscriberService, notificationService, monitorService);
+
     // Initialize Telegram Bot Handler
     botHandler = new TelegramBotHandler({
       token: process.env.TELEGRAM_BOT_TOKEN,
       subscriberService: subscriberService,
       monitorService: monitorService,
+      paymentService: paymentService, // Inject for /subscribe command
     });
 
     console.log("✅ All services initialized successfully");
@@ -112,6 +168,71 @@ cron.schedule(
     timezone: "UTC",
   },
 );
+
+// Schedule subscription expiration check - runs daily at 01:00 UTC
+cron.schedule(
+  "0 1 * * *",
+  async () => {
+    console.log("⏰ Running daily subscription expiration check...");
+    if (subscriberService) {
+        try {
+            const results = await subscriberService.checkExpirations();
+            console.log(`✅ Expiration check complete. Downgraded: ${results.downgraded}`);
+            if (monitorService) {
+                await monitorService.notifyCronRunStatus(true, "Subscription Expiration Check");
+            }
+        } catch (error) {
+            console.error("❌ Error in expiration check:", error);
+            if (monitorService) {
+                await monitorService.notifyCronRunStatus(false, "Subscription Expiration Check", error);
+            }
+        }
+    }
+  },
+  {
+    timezone: "UTC",
+  },
+);
+
+// --- Subscription Management API ---
+app.post("/api/subscription/update", async (req, res) => {
+    const apiKey = req.headers['x-api-key'];
+    if (!apiKey || apiKey !== process.env.ADMIN_API_KEY) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { chatId, tier, durationDays } = req.body;
+
+    if (!chatId || !tier) {
+        return res.status(400).json({ error: "Missing chatId or tier" });
+    }
+
+    try {
+        if (!subscriberService) {
+            return res.status(503).json({ error: "Service not available" });
+        }
+
+        const result = await subscriberService.updateSubscription(chatId, tier, durationDays, "api_purchase");
+        
+        // Notify user about update
+        if (botHandler && botHandler.bot) {
+            try {
+                await botHandler.bot.sendMessage(
+                    chatId, 
+                    `🎉 <b>Subscription Update!</b>\n\nYou have been upgraded to <b>${tier.toUpperCase()}</b> tier.\nExpires: ${result.expiresAt ? result.expiresAt.toLocaleDateString() : 'Never'}`,
+                    { parse_mode: 'HTML' }
+                );
+            } catch (e) {
+                console.warn(`Failed to notify user ${chatId} of update via API`);
+            }
+        }
+
+        res.json({ success: true, data: result });
+    } catch (error) {
+        console.error("API Subscription Update Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 // Additional endpoints for monitoring and manual control
 app.get("/stats", async (req, res) => {

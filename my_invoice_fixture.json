@@ -1,0 +1,35 @@
+{
+  "_meta": {
+    "template_version": 0
+  },
+  "fixtures": [
+    {
+      "name": "invoiceitem",
+      "path": "/v1/invoiceitems",
+      "method": "post",
+      "params": {
+        "customer": "cus_U35nG188pwVY1v",
+        "currency": "thb",
+        "description": "Premium Subscription (Simulated Renewal)",
+        "amount": 30000
+      }
+    },
+    {
+      "name": "invoice",
+      "path": "/v1/invoices",
+      "method": "post",
+      "params": {
+        "customer": "cus_U35nG188pwVY1v",
+        "auto_advance": true
+      }
+    },
+    {
+      "name": "invoice_pay",
+      "path": "/v1/invoices/${invoice:id}/pay",
+      "method": "post",
+      "params": {
+        "paid_out_of_band": true
+      }
+    }
+  ]
+}

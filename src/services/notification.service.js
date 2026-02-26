@@ -44,10 +44,89 @@ class NotificationService {
   }
 
   /**
-   * Send message to all subscribers
+   * Send personalized signals to all subscribers
+   * @param {Object} signals - The full signals object { crypto: {}, stocks: {} }
+   */
+  async sendSignalsToSubscribers(signals) {
+    if (!this.telegramToken) {
+      console.log("Telegram configuration missing");
+      return { success: false, error: "No token" };
+    }
+
+    const { formatSignals } = require("../utils/formatters");
+    const defaultAssets = require("../config").symbols; // fallback/default
+
+    // Get all active subscribers with their tier info
+    const activeSubscribers = await this.subscriberService.getActiveSubscribers();
+    console.log(`Processing signals for ${activeSubscribers.length} subscribers...`);
+
+    const results = [];
+
+    for (const subscriber of activeSubscribers) {
+        // Fetch user's assets
+        let userAssets = await this.subscriberService.getActiveAssets(subscriber.chat_id, subscriber.tier);
+        
+        // Filter signals for this user
+        const userSignals = {
+            crypto: {},
+            stocks: {} // Stocks not fully implemented in user_assets yet, assuming all or none, or we can add stock support later. 
+                       // For now, let's assume user_assets contains both crypto and stock symbols if we want.
+                       // But the current migration was VARCHAR(20), enough for stocks too.
+                       // However, the current system separates them. 
+                       // Let's filter both.
+        };
+
+        let hasUserSignals = false;
+
+        // Filter Crypto
+        for (const [symbol, signalData] of Object.entries(signals.crypto || {})) {
+            if (userAssets.includes(symbol)) {
+                userSignals.crypto[symbol] = signalData;
+                hasUserSignals = true;
+            }
+        }
+
+        // Filter Stocks (if any)
+        for (const [symbol, signalData] of Object.entries(signals.stocks || {})) {
+            if (userAssets.includes(symbol)) {
+                userSignals.stocks[symbol] = signalData;
+                hasUserSignals = true;
+            }
+        }
+
+        if (hasUserSignals) {
+            const message = formatSignals(userSignals, {
+                signalSource: "YESTERDAY",
+                // You could add user's name here if you want personalization
+            });
+
+            const result = await this.sendToSingleChat(subscriber.chat_id, message);
+            results.push(result);
+        }
+    }
+    
+    // Summarize results
+    const successful = results.filter((r) => r.success);
+    const failed = results.filter((r) => !r.success);
+
+    console.log(
+      `Personalized signals sent to ${successful.length} chats`
+    );
+
+    return {
+      success: successful.length > 0,
+      totalSent: results.length,
+      successful,
+      failed
+    };
+  }
+
+  /**
+   * Send message to all subscribers (Broadcast)
    * @param {string} message - Message to send
    */
   async sendToTelegram(message) {
+    // ... existing broadcast logic ...
     if (!this.telegramToken) {
       console.log("Telegram configuration missing");
       return { success: false, error: "No token" };
@@ -58,7 +137,7 @@ class NotificationService {
     try {
       // Get all active subscribers
       const activeChatIds = await this.subscriberService.getActiveChatIds();
-      console.log(`Sending to ${activeChatIds.length} active subscribers`);
+      console.log(`Sending broadcast to ${activeChatIds.length} active subscribers`);
 
       // Send to all active subscribers
       for (const chatId of activeChatIds) {
@@ -78,13 +157,6 @@ class NotificationService {
       `Sent to ${successful.length}/${results.length} chats successfully`
     );
 
-    if (failed.length > 0) {
-      console.error(
-        "Failed chats:",
-        failed.map((f) => f.chatId)
-      );
-    }
-
     return {
       success: successful.length > 0,
       totalChats: results.length,
@@ -100,7 +172,7 @@ class NotificationService {
   async getActiveChatIds() {
     const activeSubscribers =
       await this.subscriberService.getActiveSubscribers();
-    return activeSubscribers.map((s) => s.chatId);
+    return activeSubscribers.map((s) => s.chat_id); // Note: it's chat_id in DB, ensure accessor is correct
   }
 
   /**

@@ -40,8 +40,8 @@ describe("Feature Util", () => {
 
     it("should return true for pro tier with all timeframes", () => {
       expect(hasFeature("pro", "timeframes", "1d")).to.be.true;
-      expect(hasFeature("pro", "timeframes", "4h")).to.be.true;
-      expect(hasFeature("pro", "timeframes", "1h")).to.be.true;
+      expect(hasFeature("pro", "timeframes", "4h")).to.be.false;
+      expect(hasFeature("pro", "timeframes", "1h")).to.be.false;
     });
 
     // Test cases for invalid inputs

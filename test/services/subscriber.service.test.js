@@ -143,6 +143,51 @@ describe("SubscriberService", () => {
         expect(error.message).to.equal("Database error");
       }
     });
+
+    it("should NOT reset tier to free when existing user re-subscribes", async () => {
+      const mockPremiumUser = {
+        chat_id: "chat123",
+        subscribed: true,
+        tier: "premium",
+      };
+
+      queryStub.resolves({ rows: [mockPremiumUser] });
+
+      const result = await subscriberService.subscribe("chat123", {
+        username: "testuser",
+      });
+
+      // The ON CONFLICT UPDATE clause should NOT contain tier = 'free'
+      const insertQuery = queryStub.firstCall.args[0];
+      expect(insertQuery).to.include("ON CONFLICT (chat_id)");
+      expect(insertQuery).to.include("DO UPDATE SET");
+      // The update portion should NOT forcefully set tier
+      const updatePortion = insertQuery.split("DO UPDATE SET")[1];
+      expect(updatePortion).to.not.include("tier");
+
+      // The returned user should keep their premium tier
+      expect(result.tier).to.equal("premium");
+    });
+
+    it("should preserve tier through stop → start flow", async () => {
+      // Simulate: user is premium, does /stop, then /start
+      const mockStoppedUser = {
+        chat_id: "chat123",
+        subscribed: true, // re-subscribed
+        tier: "premium",  // tier should be preserved
+        subscription_end_at: new Date(Date.now() + 86400000 * 30),
+      };
+
+      queryStub.resolves({ rows: [mockStoppedUser] });
+
+      const result = await subscriberService.subscribe("chat123", {
+        username: "testuser",
+      });
+
+      // Tier should still be premium after re-subscribing
+      expect(result.tier).to.equal("premium");
+      expect(result.subscription_end_at).to.exist;
+    });
   });
 
   describe("unsubscribe()", () => {
@@ -347,6 +392,99 @@ describe("SubscriberService", () => {
       const result = await subscriberService.isSubscribed("nonexistent");
 
       expect(result).to.be.false;
+    });
+  });
+
+  describe("Smart Delta Asset Management", () => {
+    beforeEach(async () => {
+      queryStub.resolves({ rows: [] });
+      await subscriberService.initialize();
+      queryStub.reset();
+    });
+
+    describe("getActiveAssets()", () => {
+      it("should return default assets for free tier", async () => {
+        const config = require("../../src/config");
+        config.symbols = ["BTC", "ETH"];
+        config.stockSymbols = ["AAPL"];
+        
+        const assets = await subscriberService.getActiveAssets("chat123", "free");
+        expect(assets).to.include.members(["BTC", "ETH", "AAPL"]);
+        expect(queryStub.called).to.be.false;
+      });
+
+      it("should compute smart delta for premium tier", async () => {
+        const config = require("../../src/config");
+        config.symbols = ["BTC", "ETH"];
+        config.stockSymbols = ["AAPL"];
+
+        // User removed ETH and added TSLA
+        queryStub.resolves({
+          rows: [
+            { symbol: "ETH", action: "removed", type: "crypto" },
+            { symbol: "TSLA", action: "added", type: "stock" }
+          ]
+        });
+
+        const assets = await subscriberService.getActiveAssets("chat123", "premium");
+        
+        expect(queryStub.calledOnce).to.be.true;
+        expect(assets).to.include("BTC");
+        expect(assets).to.include("AAPL");
+        expect(assets).to.include("TSLA");
+        expect(assets).to.not.include("ETH");
+      });
+    });
+
+    describe("subscribeAsset()", () => {
+      it("should throw error for free tier", async () => {
+        try {
+          await subscriberService.subscribeAsset("chat123", "TSLA", "stock", "free");
+          expect.fail("Should throw error");
+        } catch (error) {
+          expect(error.message).to.include("Free tier cannot customize");
+        }
+      });
+
+      it("should UPSERT asset with action 'added' for premium tier", async () => {
+        queryStub.onFirstCall().resolves({ rows: [] }); // For getActiveAssets
+        queryStub.onSecondCall().resolves({ rows: [{ symbol: "TSLA", action: "added" }] }); // For UPSERT
+        
+        const result = await subscriberService.subscribeAsset("chat123", "tsla", "stock", "premium");
+        
+        expect(result.status).to.equal("added");
+        const queryArg = queryStub.secondCall.args[0];
+        expect(queryArg).to.include("INSERT INTO user_assets");
+        expect(queryArg).to.include("ON CONFLICT");
+        expect(queryArg).to.include("'added'");
+        expect(queryStub.secondCall.args[1]).to.deep.equal(["chat123", "TSLA", "stock"]);
+      });
+    });
+
+    describe("unsubscribeAsset()", () => {
+      it("should throw error for free tier", async () => {
+        try {
+          await subscriberService.unsubscribeAsset("chat123", "BTC", "free");
+          expect.fail("Should throw error");
+        } catch (error) {
+          expect(error.message).to.include("Free tier cannot customize");
+        }
+      });
+
+      it("should UPSERT asset with action 'removed' for premium tier", async () => {
+        // First call to infer type (if it's not in defaults)
+        queryStub.onFirstCall().resolves({ rows: [{ type: "crypto" }] });
+        // Second call for the actual UPSERT
+        queryStub.onSecondCall().resolves({ rows: [{ symbol: "DOGE", action: "removed" }] });
+        
+        await subscriberService.unsubscribeAsset("chat123", "doge", "premium");
+        
+        const queryArg = queryStub.lastCall.args[0];
+        expect(queryArg).to.include("INSERT INTO user_assets");
+        expect(queryArg).to.include("ON CONFLICT");
+        expect(queryArg).to.include("'removed'");
+        expect(queryStub.lastCall.args[1]).to.deep.equal(["chat123", "DOGE", "crypto"]);
+      });
     });
   });
 

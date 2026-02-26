@@ -118,6 +118,25 @@ class SignalCalculator {
     this.scanCount++;
     this.memoryMonitor.takeSnapshot(`SCAN_${this.scanCount}_START`);
 
+    // DYNAMIC ASSET LIST FETCHING
+    try {
+        if (this.notificationService && this.notificationService.subscriberService) {
+            const uniqueAssets = await this.notificationService.subscriberService.getAllUniqueSubscribedAssets();
+            
+            if (uniqueAssets) {
+                if (uniqueAssets.crypto && uniqueAssets.crypto.length > 0) {
+                    this.tradingPairs.crypto = uniqueAssets.crypto;
+                }
+                if (uniqueAssets.stocks && uniqueAssets.stocks.length > 0) {
+                    this.tradingPairs.stocks = uniqueAssets.stocks;
+                }
+                console.log(`[CALCULATOR] Updated Dynamic List: ${this.tradingPairs.crypto.length} Crypto, ${this.tradingPairs.stocks.length} Stocks`);
+            }
+        }
+    } catch (error) {
+        console.error("[CALCULATOR] Failed to update dynamic asset list:", error);
+    }
+
     const signals = { crypto: {}, stocks: {} };
     console.log(`[CALCULATOR] Starting scan #${this.scanCount}`);
 
@@ -171,24 +190,26 @@ class SignalCalculator {
         Object.keys(signals.stocks).length > 0;
 
       if (hasSignals) {
-        const message = formatSignals(signals, {
-          signalSource: "YESTERDAY",
-        });
+        // OLD: Pre-calculate message for broadcast
+        // const message = formatSignals(signals, {
+        //   signalSource: "YESTERDAY",
+        // });
 
         console.log("[CALCULATOR] Signals found:");
         console.log(`- Crypto signals: ${Object.keys(signals.crypto).length}`);
         console.log(`- Stock signals: ${Object.keys(signals.stocks).length}`);
 
-        console.log(message);
+        // console.log(message); // Logging big message might be spammy now if lists are huge
 
         if (sendNotification) {
-          await this.notificationService.sendToTelegram(message);
-          console.log("[CALCULATOR] Notification sent");
+          // NEW: Send personalized signals
+          const result = await this.notificationService.sendSignalsToSubscribers(signals);
+          console.log(`[CALCULATOR] Notification result: Success=${result.success}, Sent=${result.totalSent}`);
         } else {
           console.log("[CALCULATOR] Notification sending skipped");
         }
 
-        return { signals, message };
+        return { signals, message: "Sent personalized signals" };
       } else {
         console.log("[CALCULATOR] No signals found");
         return { signals, message: null };
