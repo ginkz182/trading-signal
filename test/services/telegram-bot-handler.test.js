@@ -326,6 +326,64 @@ describe("TelegramBotHandler", () => {
     });
   });
 
+  describe("plans command", () => {
+    it("should display plan menu if user has tier 'free' but is_auto_renewal is true", async () => {
+      // Find the plans command handler from the stub
+      const plansCall = telegramBotStub.onText
+        .getCalls()
+        .find((call) => call.args[0].toString().includes("plans"));
+      const plansHandler = plansCall.args[1];
+
+      const mockMsg = {
+        chat: { id: 123456 },
+      };
+
+      // Mock free user with lingering is_auto_renewal=true (bug before fix)
+      subscriberServiceStub.getSubscriber.resolves({ 
+        chat_id: '123456', 
+        tier: 'free', 
+        is_auto_renewal: true, 
+        subscribed: true 
+      });
+      
+      await plansHandler(mockMsg, []);
+
+      // Ensure that we do not mistakenly block and tell them they have auto-renewal active
+      expect(telegramBotStub.sendMessage.calledOnce).to.be.true;
+      const [chatId, message] = telegramBotStub.sendMessage.firstCall.args;
+      
+      expect(chatId).to.equal("123456");
+      expect(message).to.not.include("Auto-Renewal Active");
+      // It should display the plan menu
+      expect(message).to.include("💎"); // Part of plans menu typically
+    });
+    
+    it("should block if tier is not free and is_auto_renewal is true", async () => {
+      const plansCall = telegramBotStub.onText
+        .getCalls()
+        .find((call) => call.args[0].toString().includes("plans"));
+      const plansHandler = plansCall.args[1];
+
+      const mockMsg = {
+        chat: { id: 123456 },
+      };
+
+      subscriberServiceStub.getSubscriber.resolves({ 
+        chat_id: '123456', 
+        tier: 'premium', 
+        is_auto_renewal: true, 
+        subscribed: true 
+      });
+      
+      await plansHandler(mockMsg, []);
+
+      expect(telegramBotStub.sendMessage.calledOnce).to.be.true;
+      const [, message] = telegramBotStub.sendMessage.firstCall.args;
+      
+      expect(message).to.include("Auto-Renewal Active");
+    });
+  });
+
   describe("sendToChats()", () => {
     it("should send message to multiple chats", async () => {
       const chatIds = ["chat1", "chat2", "chat3"];

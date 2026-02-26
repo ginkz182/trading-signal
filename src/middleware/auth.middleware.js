@@ -46,13 +46,15 @@ const requireTier = (requiredTier, handler, services, onFailure = null) => {
             const userTier = subscriber.tier || 'free';
             const userLevel = tierLevels[userTier] || 0;
 
-            // Check if user is the hardcoded admin from .env
-            console.log(process.env.ADMIN_CHAT_ID);
-            console.log(chatId);
-            const isAdminOverride = process.env.ADMIN_CHAT_ID && chatId === process.env.ADMIN_CHAT_ID;
+            // Check if user is the hardcoded admin from .env and hasn't disabled it
+            // Default to enabled (true) unless explicitly set to 'false'
+            const overrideConfig = process.env.ADMIN_OVERRIDE;
+            const allowAdminOverride = overrideConfig !== 'false';
+            const isAdminOverride = allowAdminOverride && process.env.ADMIN_CHAT_ID && chatId === process.env.ADMIN_CHAT_ID;
 
             if (isAdminOverride || userLevel >= requiredLevel) {
                 // Authorized
+                msg.isAdminOverride = isAdminOverride;
                 
                 // Notify if access is granted SOLELY due to Admin Override
                 if (isAdminOverride && userLevel < requiredLevel) {

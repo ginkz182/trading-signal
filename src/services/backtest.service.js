@@ -41,9 +41,14 @@ class BacktestService {
   /**
    * Check if a user has remaining backtest quota this month.
    * @param {string} chatId
+   * @param {boolean} isAdminOverride
    * @returns {{ allowed: boolean, used: number, limit: number|null }}
    */
-  async checkUsageLimit(chatId) {
+  async checkUsageLimit(chatId, isAdminOverride = false) {
+    if (isAdminOverride) {
+      return { allowed: true, used: 0, limit: null };
+    }
+
     const subscriber = await this.subscriberService.getSubscriber(chatId);
     const userTier = subscriber?.tier || 'free';
     const tierConfig = config.tiers[userTier];
@@ -78,12 +83,13 @@ class BacktestService {
    * @param {string} chatId - User's chat ID
    * @param {string} symbol - Trading pair (e.g. "BTC/USDT")
    * @param {number} days - Number of days to backtest
+   * @param {boolean} isAdminOverride - Whether admin override is active
    * @returns {{ result: object, usage: { used: number, limit: number|null } }}
    * @throws {Error} If limit exceeded, data unavailable, or engine error
    */
-  async execute(chatId, symbol, days) {
+  async execute(chatId, symbol, days, isAdminOverride = false) {
     // 1. Check usage limit
-    const usageCheck = await this.checkUsageLimit(chatId);
+    const usageCheck = await this.checkUsageLimit(chatId, isAdminOverride);
     if (!usageCheck.allowed) {
       const err = new Error('LIMIT_EXCEEDED');
       err.code = 'LIMIT_EXCEEDED';

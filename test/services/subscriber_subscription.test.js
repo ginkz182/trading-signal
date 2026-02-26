@@ -127,6 +127,20 @@ describe("SubscriberService - Subscription Management", () => {
 
             expect(updateParams[1]).to.be.null; // subscription_end_at should be null
         });
+
+        it("should reset is_auto_renewal to false when downgrading to free tier", async () => {
+            const chatId = "12345";
+
+            clientStub.query.withArgs("SELECT tier, subscription_end_at FROM subscribers WHERE chat_id = $1", [chatId])
+                .resolves({ rows: [{ tier: "premium", subscription_end_at: new Date() }] });
+
+            await service.updateSubscription(chatId, "free", null, "downgrade");
+
+            const updateCall = clientStub.query.getCall(2);
+            const updateQuery = updateCall.args[0];
+
+            expect(updateQuery).to.include("is_auto_renewal = false");
+        });
     });
 
     describe("checkExpirations", () => {
@@ -151,6 +165,7 @@ describe("SubscriberService - Subscription Management", () => {
             const updateCalls = clientStub.query.getCalls().filter(call => call.args[0].includes("UPDATE subscribers"));
             expect(updateCalls.length).to.equal(2);
             expect(updateCalls[0].args[0]).to.include("SET tier = 'free'");
+            expect(updateCalls[0].args[0]).to.include("is_auto_renewal = false");
         });
     });
 });

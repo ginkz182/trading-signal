@@ -464,9 +464,14 @@ class SubscriberService {
 
       // 3. Update subscribers table
       // Note: If newTier is 'free', we might want to clear subscription_end_at or keep it as null
+      let isAutoRenewalUpdate = '';
+      if (newTier === 'free') {
+        isAutoRenewalUpdate = ', is_auto_renewal = false';
+      }
+      
       await client.query(
         `UPDATE subscribers 
-         SET tier = $1, subscription_end_at = $2, last_updated = CURRENT_TIMESTAMP 
+         SET tier = $1, subscription_end_at = $2, last_updated = CURRENT_TIMESTAMP${isAutoRenewalUpdate} 
          WHERE chat_id = $3`,
         [newTier, newEndAt, chatId]
       );
@@ -519,7 +524,7 @@ class SubscriberService {
         // Downgrade to free
         await client.query(
           `UPDATE subscribers 
-           SET tier = 'free', subscription_end_at = NULL, last_updated = CURRENT_TIMESTAMP 
+           SET tier = 'free', subscription_end_at = NULL, is_auto_renewal = false, last_updated = CURRENT_TIMESTAMP 
            WHERE chat_id = $1`,
           [row.chat_id]
         );

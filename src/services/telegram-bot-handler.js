@@ -138,7 +138,8 @@ class TelegramBotHandler {
     const chatId = msg.chat.id.toString();
     try {
       const subscriber = await this.subscriberService.getSubscriber(chatId);
-      const tier = subscriber ? subscriber.tier : 'free';
+      let tier = subscriber ? subscriber.tier : 'free';
+      if (msg.isAdminOverride) tier = 'admin';
       const assets = await this.subscriberService.getActiveAssetsWithTypes(chatId, tier);
       let text = messages.assetListHeader(0); // Count not used in header template currently
       
@@ -179,7 +180,8 @@ class TelegramBotHandler {
           }
 
           const subscriber = await this.subscriberService.getSubscriber(chatId);
-          const tier = subscriber ? subscriber.tier : 'free';
+          let tier = subscriber ? subscriber.tier : 'free';
+          if (msg.isAdminOverride) tier = 'admin';
 
           const result = await this.subscriberService.subscribeAsset(chatId, validation.formattedSymbol, validation.type, tier);
           
@@ -202,7 +204,8 @@ class TelegramBotHandler {
 
     try {
         const subscriber = await this.subscriberService.getSubscriber(chatId);
-        const tier = subscriber ? subscriber.tier : 'free';
+        let tier = subscriber ? subscriber.tier : 'free';
+        if (msg.isAdminOverride) tier = 'admin';
         const userAssets = await this.subscriberService.getActiveAssets(chatId, tier);
         let targetSymbol = null;
 
@@ -410,7 +413,7 @@ class TelegramBotHandler {
       }
 
       // Block if already on auto-renewal to prevent duplicate subscriptions
-      if (subscriber?.is_auto_renewal) {
+      if (userTier !== 'free' && subscriber?.is_auto_renewal) {
         const expires = subscriber?.subscription_end_at
           ? dayjs(subscriber.subscription_end_at).format('DD MMM YYYY')
           : null;
@@ -466,7 +469,7 @@ class TelegramBotHandler {
       const loadingMsg = await this.bot.sendMessage(chatId, messages.backtestLoading(symbol, days), { parse_mode: 'HTML' });
 
       // 3. Execute backtest (limit check, fetch, run, record — all in service)
-      const { result, usage } = await this.backtestService.execute(chatId, symbol, days);
+      const { result, usage } = await this.backtestService.execute(chatId, symbol, days, msg.isAdminOverride);
 
       // 4. Build report
       let report = messages.backtestReport(result);
