@@ -79,6 +79,6 @@ describe("Auth Middleware", () => {
         await middleware(mockMsg);
 
         expect(handler.called).to.be.false;
-        expect(mockBot.sendMessage.calledWith(sinon.match.any, sinon.match("not subscribed"))).to.be.true;
+        expect(mockBot.sendMessage.calledWith(sinon.match.any, sinon.match("turned off"))).to.be.true;
     });
 });
