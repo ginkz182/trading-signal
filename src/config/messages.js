@@ -5,31 +5,7 @@
 const config = require('../config');
 const dayjs = require('dayjs');
 
-const messages = {
-    // General / Navigation
-    welcome: `🚀 <b>Welcome to Purrrfect Signal!</b>
-
-You are now subscribed to receive trading signals.
-
-<b>Available Commands:</b>
-/status - Check your subscription status
-/assetlist - See your monitored assets
-/plans - View upgrade options
-/upgrade - Upgrade to RESIDENT tier
-/cancel - Cancel auto-renewal
-/start - Turn on notifications
-/stop - Turn off notifications
-/support &lt;message&gt; - Contact our support team
-/help - Show help message
-
-<b>Advanced Commands (Purrfect Resident+):</b>
-/add [SYMBOL] - Add an asset to your list
-/remove [SYMBOL] - Remove an asset
-/backtest [SYMBOL] [DAYS] - Run a backtest simulation
-`,
-    help: `<b>🤖 Purrrfect Signal Bot Commands</b>
-
-<b>Basic:</b>
+const commandListText = `<b>Basic:</b>
 /start - Turn on notifications
 /stop - Turn off notifications
 /status - Check your subscription status
@@ -43,8 +19,22 @@ You are now subscribed to receive trading signals.
 <b>Purrfect Resident Tier:</b>
 /add &lt;symbol&gt; - Add an asset (e.g. /add SOL)
 /remove &lt;symbol&gt; - Remove an asset
-/backtest &lt;symbol&gt; &lt;days&gt; - Backtest a strategy (e.g. /backtest BTC/USDT 365)
-`,
+/backtest &lt;symbol&gt; &lt;days&gt; - Backtest a strategy. Requires a period in days. Runs with a $10,000 starting balance (e.g. /backtest BTC/USDT 365)
+
+🔗 <b>More Details:</b> <a href="https://withnatsiree.com/purrrfectsignal/">withnatsiree.com/purrrfectsignal</a>`;
+
+const messages = {
+    // General / Navigation
+    welcome: `🚀 <b>Welcome to Purrrfect Signal!</b>
+
+You are now subscribed to receive trading signals.
+
+<b>Available Commands:</b>
+
+${commandListText}`,
+    help: `<b>🤖 Purrrfect Signal Bot Commands</b>
+
+${commandListText}`,
     unsubscribeSuccess: "✅ You have turned off trading signals notifications. Use /start to turn them on again.",
     notSubscribed: "❌ Notifications are turned off. Use /start to turn them on.",
     errorGeneric: "Sorry, there was an error. Please try again.",

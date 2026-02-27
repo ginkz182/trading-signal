@@ -1,6 +1,7 @@
 const Stripe = require('stripe');
 const config = require('../config');
 const messages = require('../config/messages');
+const dayjs = require('dayjs');
 
 class PaymentService {
     constructor(subscriberService, notificationService, monitorService) {
@@ -217,7 +218,7 @@ Retrying in a few days...`
                         const tierConfig = config.tiers.premium;
                         const tierDisplay = tierConfig.displayName.toUpperCase();
                         const expiry = updatedSub?.subscription_end_at
-                            ? `\n<b>Expires:</b> ${new Date(updatedSub.subscription_end_at).toLocaleDateString()}`
+                            ? `\n<b>Expires:</b> ${dayjs(updatedSub.subscription_end_at).format('DD MMM YYYY')}`
                             : '';
                         await this.notificationService.sendToSingleChat(
                             chatId,
@@ -308,7 +309,7 @@ Retrying in a few days...`
                 try {
                     const updatedSub = await this.subscriberService.getSubscriber(chatId);
                     const expiry = updatedSub?.subscription_end_at
-                        ? new Date(updatedSub.subscription_end_at).toLocaleDateString()
+                        ? dayjs(updatedSub.subscription_end_at).format('DD MMM YYYY')
                         : 'N/A';
                     await this.notificationService.sendToSingleChat(
                         chatId,
@@ -414,9 +415,9 @@ Retrying in a few days...`
             const periodEnd = subscriptions.data[0].current_period_end;
             let expiryDate;
             if (periodEnd) {
-                expiryDate = new Date(periodEnd * 1000).toLocaleDateString();
+                expiryDate = dayjs(periodEnd * 1000).format('DD MMM YYYY');
             } else if (subscriber.subscription_end_at) {
-                expiryDate = new Date(subscriber.subscription_end_at).toLocaleDateString();
+                expiryDate = dayjs(subscriber.subscription_end_at).format('DD MMM YYYY');
             } else {
                 expiryDate = 'your current billing period';
             }
