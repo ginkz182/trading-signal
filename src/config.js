@@ -24,7 +24,7 @@ const config = {
     "CCJ",
     "RTX",
     "GEV",
-    "GOLD",
+    "GC=F",
   ],
   timeframe: "1d",
   tiers: {
