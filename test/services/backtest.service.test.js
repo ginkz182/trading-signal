@@ -165,6 +165,19 @@ describe("BacktestService", () => {
       expect(result.initialCapital).to.equal(50000);
       expect(result.finalValue).to.equal(50000);
     });
+
+    it("should filter out invalid candles with null or zero prices", () => {
+      // Create normal candles, but inject null prices at the end
+      const candles = makeFlatCandles(200, 100);
+      candles.push({ time: Date.now(), open: 0, high: 0, low: 0, close: null, volume: 0 });
+      candles.push({ time: Date.now(), open: 0, high: 0, low: 0, close: 0, volume: 0 });
+
+      const result = backtestService.run(candles, 150);
+
+      // Math shouldn't be ruined; finalValue should remain 10000 instead of 0
+      expect(result.finalValue).to.equal(10000);
+      expect(result.totalTrades).to.equal(0);
+    });
   });
 
   // --- run() - exact calculation tests (golden values) ---

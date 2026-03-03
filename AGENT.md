@@ -25,7 +25,7 @@
 
 ## 🏗 Architecture: The Override Model
 - **Override Logic:** - **Free Users:** Inherit `config.js` default assets only.
-    - **Premium/Ultimate Users:** Inherit `config.js` defaults initially. Upon using `/subscribe` or `/unsubscribe`, a unique list is persisted to the `user_assets` table. Once custom assets exist, the global config defaults are ignored for that specific user.
+    - **Premium/Ultimate Users:** Inherit `config.js` defaults initially. Upon using `/add` or `/remove`, a unique list is persisted to the `user_assets` table. Once custom assets exist, the global config defaults are ignored for that specific user.
     - **Smart Validation:** The system prevents duplicate subscriptions (checking both default and custom lists) and validates assets against exchanges before adding.
 - **Monitoring:** `monitor.service.js` sends real-time alerts to `ADMIN_CHAT_ID` for registration, tier changes, and validation failures.
 - **Data Flow:** Cron (00:05) -> ExchangeServicePool (Fetch) -> MarketDataProcessor (Window) -> IndicatorManager (Analyze) -> NotificationService (Dispatch).
@@ -60,8 +60,8 @@
 
 ### Purrfect Resident (Premium)
 - `/assetlist` - View monitored assets.
-- `/subscribe <SYMBOL>` - Add asset (Smart duplicate detection & default checking).
-- `/unsubscribe <SYMBOL>` - Remove asset.
+- `/add <SYMBOL>` - Add asset (Smart duplicate detection & default checking).
+- `/remove <SYMBOL>` - Remove asset.
 - `/request <SYMBOL>` - Request a new asset to be added to the system.
 - `/backtest <SYMBOL> <DAYS>` - Run a backtest simulation (Strategies: CDC Action Zone). Limited based on `config.tiers.premium.backtestLimit` (e.g. 3 times/month).
 
@@ -85,6 +85,13 @@
 - `POST /api/subscription/update` - Programmatically upgrade users (requires `x-api-key`).
 - `GET /stats` - Subscriber and system statistics.
 - `POST /trigger-scan` - Manual signal scan trigger.
+
+---
+
+## 🚀 Deployment & First-Time Setup
+1. **Database:** Ensure PostgreSQL is running and `DATABASE_URL` is set in the `.env` file.
+2. **Migrations:** Run `node scripts/run-migrations.js` to create all tables.
+3. **Data Population:** **CRITICAL:** Run `node scripts/init-asset-states.js` on the **Production Database** to populate historical signal data for the `/position` tracker. This ensures all default and premium user assets have accurate historical PnL and active trend statuses before the first scheduled cron run.
 
 ---
 

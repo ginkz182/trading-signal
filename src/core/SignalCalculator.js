@@ -145,6 +145,17 @@ class SignalCalculator {
       const signalData = await this._processTradingPair(symbol, "crypto");
       if (signalData) {
         signals.crypto[symbol] = signalData;
+
+        // Update asset state
+        if (this.notificationService && this.notificationService.subscriberService) {
+          const subSvc = this.notificationService.subscriberService;
+          const now = new Date();
+          if (signalData.signal === 'BUY') {
+            await subSvc.recordBuySignal(symbol, signalData.price, now);
+          } else if (signalData.signal === 'SELL') {
+            await subSvc.recordSellSignal(symbol, signalData.price, now);
+          }
+        }
       }
     }
 
@@ -153,6 +164,17 @@ class SignalCalculator {
       const signalData = await this._processTradingPair(symbol, "stocks");
       if (signalData) {
         signals.stocks[symbol] = signalData;
+
+        // Update asset state
+        if (this.notificationService && this.notificationService.subscriberService) {
+          const subSvc = this.notificationService.subscriberService;
+          const now = new Date();
+          if (signalData.signal === 'BUY') {
+            await subSvc.recordBuySignal(symbol, signalData.price, now);
+          } else if (signalData.signal === 'SELL') {
+            await subSvc.recordSellSignal(symbol, signalData.price, now);
+          }
+        }
       }
     }
 
@@ -231,6 +253,49 @@ class SignalCalculator {
     }
 
     console.log("[CALCULATOR] Cleanup complete");
+  }
+
+  async initializeAssetState(symbol, marketType) {
+    try {
+      if (!this.notificationService?.subscriberService) return;
+      
+      const subSvc = this.notificationService.subscriberService;
+      const existing = await subSvc.getAssetState(symbol);
+      if (existing) return;
+
+      const serviceType = marketType === "crypto" ? "kucoin" : "yahoo";
+      const exchangeService = await this.servicePool.getService(serviceType, this.config.timeframe);
+      const rawPrices = await exchangeService.getPrices(symbol);
+      
+      if (!rawPrices) return;
+
+      const processedData = this.dataProcessor.prepareForAnalysis(rawPrices, marketType, symbol);
+      if (!processedData) return;
+
+      const crossover = this.indicatorManager.findLastCrossover(processedData.prices, symbol);
+
+      if (crossover && crossover.signal !== "HOLD") {
+          const pastDate = new Date();
+          pastDate.setDate(pastDate.getDate() - crossover.daysAgo);
+          
+          if (crossover.signal === "BUY") {
+              await subSvc.recordBuySignal(symbol, crossover.price, pastDate);
+              console.log(`[INITIALIZE] ${symbol} initialized as UPTREND from ${crossover.daysAgo} days ago.`);
+          } else if (crossover.signal === "SELL") {
+              // If we have the previous BUY, record it first so PnL percentage is correctly generated
+              if (crossover.previousSignal && crossover.previousSignal.signal === "BUY") {
+                  const prevDate = new Date();
+                  prevDate.setDate(prevDate.getDate() - crossover.previousSignal.daysAgo);
+                  await subSvc.recordBuySignal(symbol, crossover.previousSignal.price, prevDate);
+              }
+              
+              await subSvc.recordSellSignal(symbol, crossover.price, pastDate);
+              console.log(`[INITIALIZE] ${symbol} initialized as DOWNTREND from ${crossover.daysAgo} days ago (Found previous entry: ${!!crossover.previousSignal}).`);
+          }
+      }
+    } catch (e) {
+      console.error(`Error initializing asset state for ${symbol}:`, e);
+    }
   }
 
   // ENHANCED: More comprehensive analysis

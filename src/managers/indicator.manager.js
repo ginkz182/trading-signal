@@ -68,6 +68,13 @@ class IndicatorManager {
     // No zones to reset in this simplified version
     return;
   }
+
+  findLastCrossover(prices, symbol) {
+    if (!prices || prices.length < 28) {
+      return { signal: "HOLD", daysAgo: -1, price: null };
+    }
+    return this.technicalService.findLastCrossover(prices);
+  }
 }
 
 module.exports = IndicatorManager;

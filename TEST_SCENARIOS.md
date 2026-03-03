@@ -73,15 +73,15 @@ This document outlines a complete set of manual test cases for verifying the Tra
 ## 3. Tier Management and Access Control
 
 ### 3.1 Free Tier Restrictions
-- [ x] **Action:** (On a free account) Send `/subscribe AAPL`.
+- [ x] **Action:** (On a free account) Send `/add AAPL`.
 - [ x] **Expected Result:** Bot blocks the action with a message: "Free tier cannot customize assets. Please upgrade."
-- [ x] **Action:** Send `/unsubscribe BTC`.
+- [ x] **Action:** Send `/remove BTC`.
 - [ x] **Expected Result:** Bot blocks the action.
 - [ x] **Action:** Send `/backtest BTC 100`.
 - [ x] **Expected Result:** Bot blocks the action (Free tier backtest limit is 0).
 
 ### 3.2 Premium Tier Access
-- [ x] **Action:** (On a premium account) Send `/subscribe AAPL`.
+- [ x] **Action:** (On a premium account) Send `/add AAPL`.
 - [ x] **Expected Result:** Bot adds the asset successfully.
 - [ x] **Action:** Send `/backtest BTC 100`.
 - [ x] **Expected Result:** Backtest runs successfully.
@@ -98,17 +98,17 @@ This document outlines a complete set of manual test cases for verifying the Tra
 *(Prerequisite: User must be on the Premium tier)*
 
 ### 4.1 Adding Custom Assets (Delta: Added)
-- [ ] **Action:** Send `/subscribe NVDA` (assuming NVDA is a default).
+- [ ] **Action:** Send `/add NVDA` (assuming NVDA is a default).
 - [ ] **Expected Result:** Bot replies: "⚠️ You are already subscribed to NVDA."
-- [ ] **Action:** Send `/subscribe DOGE`.
+- [ ] **Action:** Send `/add DOGE`.
 - [ ] **Expected Result:** Bot confirms DOGE added. DB `user_assets` shows DOGE with action `added`.
 
 ### 4.2 Removing Default Assets (Delta: Removed)
-- [ ] **Action:** Send `/unsubscribe BTC/USDT` (or BTC).
+- [ ] **Action:** Send `/remove BTC/USDT` (or BTC).
 - [ ] **Expected Result:** Bot confirms removal. DB shows BTC with action `removed`.
 
 ### 4.3 Re-adding a Removed Default
-- [ x] **Action:** Send `/subscribe BTC`.
+- [ x] **Action:** Send `/add BTC`.
 - [ x] **Expected Result:** Bot confirms addition. DB updates that row to `added` due to the UPSERT logic.
 
 ### 4.4 Verifying the Combined List

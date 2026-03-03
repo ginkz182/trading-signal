@@ -143,8 +143,14 @@ class BacktestService {
       throw new Error(`Not enough data. Need at least ${warmupPeriod + 5} candles, got ${candles.length}.`);
     }
 
-    // Get close prices
-    const closePrices = candles.map(c => c.close);
+    // Get close prices, filter out nulls/zeros to prevent math destruction
+    const validCandles = candles.filter(c => c.close !== null && c.close > 0);
+    
+    if (validCandles.length < warmupPeriod + 5) {
+      throw new Error(`Not enough valid data. Need at least ${warmupPeriod + 5} valid candles, got ${validCandles.length}.`);
+    }
+
+    const closePrices = validCandles.map(c => c.close);
 
     // Calculate EMAs over the entire dataset
     const fastEMA = this.technical.calculateEMA(closePrices, 12);
@@ -157,7 +163,7 @@ class BacktestService {
     // The effective trading window starts after the slow EMA warmup
     // We want the LAST `days` candles for the backtest period
     const dataStartIdx = 25; // First candle index where we have both EMAs
-    const dataEndIdx = candles.length - 1;
+    const dataEndIdx = validCandles.length - 1;
     const backtestStartIdx = Math.max(dataStartIdx, dataEndIdx - days + 1);
 
     // Simulation state
@@ -184,7 +190,7 @@ class BacktestService {
       const previousSlow = slowEMA[slowIdx - 1];
 
       const price = closePrices[i];
-      const time = candles[i].time;
+      const time = validCandles[i].time;
 
       // BUY signal: Fast EMA crosses above Slow EMA
       if (!inPosition && previousFast <= previousSlow && currentFast > currentSlow) {
@@ -238,8 +244,8 @@ class BacktestService {
       unrealizedPnl: inPosition ? parseFloat(unrealizedPnl.toFixed(2)) : null,
       trades,
       period: {
-        from: new Date(candles[backtestStartIdx].time),
-        to: new Date(candles[dataEndIdx].time),
+        from: new Date(validCandles[backtestStartIdx].time),
+        to: new Date(validCandles[dataEndIdx].time),
       },
     };
   }

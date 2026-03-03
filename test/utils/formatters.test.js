@@ -10,7 +10,7 @@ describe("Formatters", () => {
     const disclaimer =
       "\n\n<i>💡 Disclaimer: All signals are for educational purposes only. Trade at your own risk. Past performance does not guarantee future profits.</i>";
 
-    it("should display GOLD instead of GC=F for gold futures", () => {
+    it("should display GC=F (Gold Future) for gold futures", () => {
       const signals = {
         crypto: {},
         stocks: {
@@ -23,8 +23,7 @@ describe("Formatters", () => {
 
       const message = formatSignals(signals);
 
-      expect(message).to.include("GOLD");
-      expect(message).to.not.include("GC=F");
+      expect(message).to.include("GC=F (Gold Future)");
       expect(message).to.include("BUY");
       expect(message).to.include("$4094.10");
       expect(message.endsWith(disclaimer)).to.be.true;
@@ -73,8 +72,7 @@ describe("Formatters", () => {
       expect(message).to.include("CRYPTO");
       expect(message).to.include("BTC/USDT");
       expect(message).to.include("STOCKS");
-      expect(message).to.include("GOLD");
-      expect(message).to.not.include("GC=F");
+      expect(message).to.include("GC=F (Gold Future)");
       expect(message).to.include("NVDA");
       expect(message.endsWith(disclaimer)).to.be.true;
     });

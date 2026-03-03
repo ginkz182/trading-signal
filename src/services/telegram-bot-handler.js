@@ -10,9 +10,10 @@ const ValidationService = require("./validation.service");
 const BacktestService = require("./backtest.service");
 const SupportService = require("./support.service");
 const messages = require("../config/messages");
+const { getSymbolDisplayName } = require("../utils/formatters");
 
 class TelegramBotHandler {
-  constructor({ token, subscriberService, monitorService, paymentService }) {
+  constructor({ token, subscriberService, monitorService, paymentService, signalCalculator }) {
     this.bot = new TelegramBot(token, {
         polling: {
           interval: 1000, 
@@ -26,10 +27,12 @@ class TelegramBotHandler {
     this.validationService = new ValidationService();
     this.backtestService = new BacktestService({ subscriberService });
     this.supportService = new SupportService({ bot: this.bot, pool: this.subscriberService?.pool });
+    this.signalCalculator = signalCalculator;
     
     this.services = {
         subscriberService: this.subscriberService,
         paymentService: this.paymentService,
+        signalCalculator: this.signalCalculator,
         bot: this.bot
     };
     
@@ -45,7 +48,7 @@ class TelegramBotHandler {
     this.bot.onText(/^\/help(?:@[^\s]+)?$/, (msg) => this._handleHelp(msg));
     
     // Tier-protected commands
-    this.bot.onText(/^\/assetlist(?:@[^\s]+)?/, requireTier('free', (msg) => this._handleAssetList(msg), this.services));
+    this.bot.onText(/^\/assetlist(?:@[^\s]+)?$/, requireTier('free', (msg) => this._handleAssetList(msg), this.services));
     
     // Payment / Subscription
     this.bot.onText(/^\/plans(?:@[^\s]+)?\s*(.*)?/, (msg, match) => this._handlePlans(msg, match));
@@ -57,6 +60,10 @@ class TelegramBotHandler {
     this.bot.onText(/^\/add(?:@[^\s]+)?\s+(.+)/, requireTier('premium', (msg, match) => this._handleSubscribeAsset(msg, match), this.services));
     this.bot.onText(/^\/remove(?:@[^\s]+)?\s+(.+)/, requireTier('premium', (msg, match) => this._handleUnsubscribeAsset(msg, match), this.services));
     this.bot.onText(/^\/request(?:@[^\s]+)?\s+(.+)/, (msg, match) => this._handleRequestAsset(msg, match));
+
+    // Position Tracker
+    this.bot.onText(/^\/position(?:@[^\s]+)?$/, (msg) => this._handlePosition(msg));
+    this.bot.onText(/^\/pos(?:@[^\s]+)?$/, (msg) => this._handlePosition(msg));
 
     // Backtest (Premium with limit)
     this.bot.onText(/^\/backtest(?:@[^\s]+)?(?:\s+(.+))?/, requireTier('premium', (msg, match) => this._handleBacktest(msg, match), this.services));
@@ -148,11 +155,13 @@ class TelegramBotHandler {
 
       if (assets.crypto.length > 0) {
           assets.crypto.sort((a, b) => a.localeCompare(b));
-          text += `<b>🪙 Crypto (${assets.crypto.length})</b>\n<code>${assets.crypto.join('\n')}</code>\n\n`;
+          const formattedCrypto = assets.crypto.map(s => getSymbolDisplayName(s));
+          text += `<b>🪙 Crypto (${assets.crypto.length})</b>\n<code>${formattedCrypto.join('\n')}</code>\n\n`;
       }
       if (assets.stocks.length > 0) {
           assets.stocks.sort((a, b) => a.localeCompare(b));
-          text += `<b>📈 Stocks (${assets.stocks.length})</b>\n<code>${assets.stocks.join('\n')}</code>\n\n`;
+          const formattedStocks = assets.stocks.map(s => getSymbolDisplayName(s));
+          text += `<b>📈 Stocks (${assets.stocks.length})</b>\n<code>${formattedStocks.join('\n')}</code>\n\n`;
       }
       if (assets.crypto.length === 0 && assets.stocks.length === 0) {
           text += messages.assetListEmpty;
@@ -185,12 +194,18 @@ class TelegramBotHandler {
 
           const result = await this.subscriberService.subscribeAsset(chatId, validation.formattedSymbol, validation.type, tier);
           
+          if (result.status === 'added' && this.services.signalCalculator) {
+              this.services.signalCalculator.initializeAssetState(validation.formattedSymbol, validation.type).catch(e => console.error("Initialize error:", e));
+          }
+
+          const displaySymbol = getSymbolDisplayName(validation.formattedSymbol);
+
           if (result.status === 'exists') {
-              return this.bot.sendMessage(chatId, messages.assetExists(validation.formattedSymbol), { parse_mode: 'HTML' });
+              return this.bot.sendMessage(chatId, messages.assetExists(displaySymbol), { parse_mode: 'HTML' });
           }
 
           const icon = validation.type === 'stock' ? '📈' : '🪙';
-          await this.bot.sendMessage(chatId, messages.assetAdded(validation.formattedSymbol, validation.type, icon), { parse_mode: 'HTML' });
+          await this.bot.sendMessage(chatId, messages.assetAdded(displaySymbol, validation.type, icon), { parse_mode: 'HTML' });
       } catch (e) {
           console.error("/subscribe error:", e);
           await this.bot.sendMessage(chatId, messages.errorGeneric);
@@ -221,8 +236,9 @@ class TelegramBotHandler {
             return this.bot.sendMessage(chatId, messages.assetRemoveNotFound(rawSymbol), { parse_mode: 'HTML' });
         }
 
+        const displaySymbol = getSymbolDisplayName(targetSymbol);
         await this.subscriberService.unsubscribeAsset(chatId, targetSymbol, tier);
-        await this.bot.sendMessage(chatId, messages.assetRemoveSuccess(targetSymbol), { parse_mode: 'HTML' });
+        await this.bot.sendMessage(chatId, messages.assetRemoveSuccess(displaySymbol), { parse_mode: 'HTML' });
     } catch (e) {
         console.error("/unsubscribe error:", e);
         await this.bot.sendMessage(chatId, messages.errorGeneric);
@@ -248,6 +264,110 @@ class TelegramBotHandler {
           console.error("/request error:", e);
           await this.bot.sendMessage(chatId, messages.errorGeneric);
       }
+  }
+
+  async _handlePosition(msg) {
+    const chatId = msg.chat.id.toString();
+    try {
+      if (!this.services.signalCalculator) {
+          return this.bot.sendMessage(chatId, messages.positionUnavailable);
+      }
+      await this.bot.sendChatAction(chatId, 'typing');
+
+      const subscriber = await this.subscriberService.getSubscriber(chatId);
+      let tier = subscriber ? subscriber.tier : 'free';
+      if (msg.isAdminOverride) tier = 'admin';
+      
+      const assets = await this.subscriberService.getActiveAssetsWithTypes(chatId, tier);
+      const activeSymbols = [...assets.crypto, ...assets.stocks];
+
+      if (activeSymbols.length === 0) {
+          return this.bot.sendMessage(chatId, messages.positionNoAssets);
+      }
+
+      // Fetch states
+      const states = await this.subscriberService.getAssetStates(activeSymbols);
+      const stateMap = {};
+      for (const s of states) {
+          stateMap[s.symbol] = s;
+      }
+
+      const upTrendMap = {};
+      const downTrendMap = {};
+      
+      const servicePool = this.services.signalCalculator.servicePool;
+
+      for (const symbol of activeSymbols) {
+          const state = stateMap[symbol];
+          
+          if (!state) {
+              continue; // Not initialized yet
+          }
+
+          if (state.current_trend === 'UPTREND') {
+              // Fetch live price
+              const isCrypto = assets.crypto.includes(symbol);
+              const type = isCrypto ? 'kucoin' : 'yahoo';
+              const exchangeSvc = await servicePool.getService(type, this.services.signalCalculator.config.timeframe);
+              const prices = await exchangeSvc.getPrices(symbol);
+              
+              let unrealizedPnl = null;
+              let currentPrice = null;
+              if (prices && prices.length > 0 && state.entry_price) {
+                 currentPrice = prices[prices.length - 1];
+                 unrealizedPnl = ((currentPrice - state.entry_price) / state.entry_price) * 100;
+              }
+              upTrendMap[symbol] = { state, unrealizedPnl, currentPrice };
+          } else if (state.current_trend === 'DOWNTREND') {
+              downTrendMap[symbol] = { state };
+          }
+      }
+
+      let report = messages.positionHeader;
+
+      const appendSection = (title, symbolsArray) => {
+          let sectionContent = "";
+          let sectionCount = 0;
+          
+          const sortedSymbols = [...symbolsArray].sort((a, b) => a.localeCompare(b));
+          
+          for (const symbol of sortedSymbols) {
+              const displaySymbol = getSymbolDisplayName(symbol);
+              if (upTrendMap[symbol]) {
+                  const item = upTrendMap[symbol];
+                  const pnlStr = item.unrealizedPnl !== null ? `${item.unrealizedPnl >= 0 ? '+' : ''}${item.unrealizedPnl.toFixed(2)}%` : "N/A";
+                  const entryPriceStr = item.state.entry_price ? `$${parseFloat(item.state.entry_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}` : "N/A";
+                  const currentPriceStr = item.currentPrice ? `$${parseFloat(item.currentPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}` : "N/A";
+                  sectionContent += messages.positionUpItem(displaySymbol, pnlStr, entryPriceStr, currentPriceStr);
+                  sectionCount++;
+              } else if (downTrendMap[symbol]) {
+                  const item = downTrendMap[symbol];
+                  const pnlStr = item.state.realized_pnl_percentage !== null ? `${item.state.realized_pnl_percentage >= 0 ? '+' : ''}${parseFloat(item.state.realized_pnl_percentage).toFixed(2)}%` : "N/A";
+                  const exitPriceStr = item.state.exit_price ? `$${parseFloat(item.state.exit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}` : "N/A";
+                  const entryPriceStr = item.state.entry_price ? `$${parseFloat(item.state.entry_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}` : "N/A";
+                  sectionContent += messages.positionDownItem(displaySymbol, pnlStr, entryPriceStr, exitPriceStr);
+                  sectionCount++;
+              }
+          }
+          
+          if (sectionCount > 0) {
+              report += `<b>${title} (${sectionCount})</b>\n\n${sectionContent}`;
+          }
+      };
+
+      appendSection("🪙 Crypto", assets.crypto);
+      appendSection("📈 Stocks", assets.stocks);
+
+      if (Object.keys(upTrendMap).length === 0 && Object.keys(downTrendMap).length === 0) {
+          report += messages.positionEmpty;
+      }
+
+      await this.bot.sendMessage(chatId, report.trim(), { parse_mode: 'HTML' });
+
+    } catch (e) {
+      console.error("/position error:", e);
+      await this.bot.sendMessage(chatId, messages.positionError);
+    }
   }
 
   async _handlePaymentCallback(callbackQuery) {
@@ -466,13 +586,15 @@ class TelegramBotHandler {
 
     try {
       // 2. Send loading message
-      const loadingMsg = await this.bot.sendMessage(chatId, messages.backtestLoading(symbol, days), { parse_mode: 'HTML' });
+      const displaySymbol = getSymbolDisplayName(symbol);
+      const loadingMsg = await this.bot.sendMessage(chatId, messages.backtestLoading(displaySymbol, days), { parse_mode: 'HTML' });
 
       // 3. Execute backtest (limit check, fetch, run, record — all in service)
       const { result, usage } = await this.backtestService.execute(chatId, symbol, days, msg.isAdminOverride);
 
       // 4. Build report
-      let report = messages.backtestReport(result);
+      const reportData = { ...result, symbol: displaySymbol };
+      let report = messages.backtestReport(reportData);
       if (usage.limit !== null) {
         report += `\n\n` + messages.backtestUsage(usage.used, usage.limit);
       }

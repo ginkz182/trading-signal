@@ -146,6 +146,7 @@ async function initializeServices() {
       subscriberService: subscriberService,
       monitorService: monitorService,
       paymentService: paymentService, // Inject for /subscribe command
+      signalCalculator: signalCalculator,
     });
 
     console.log("✅ All services initialized successfully");

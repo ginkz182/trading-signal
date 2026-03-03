@@ -8,7 +8,7 @@ const dayjs = require("dayjs");
  * Symbol display name mapping for better readability
  */
 const SYMBOL_DISPLAY_NAMES = {
-  "GC=F": "GOLD",
+  "GC=F": "GC=F (Gold Future)",
   // Add more mappings as needed
 };
 
@@ -231,4 +231,5 @@ module.exports = {
   formatZoneEmoji,
   formatTechnicalData,
   formatPrice,
+  getSymbolDisplayName,
 };

@@ -10,6 +10,7 @@ const commandListText = `<b>Basic:</b>
 /stop - Turn off notifications
 /status - Check your subscription status
 /assetlist - See your monitored assets
+/position - View your active positions and PnL
 /plans - View upgrade options
 /upgrade - Upgrade to RESIDENT tier
 /cancel - Cancel auto-renewal
@@ -126,6 +127,15 @@ You already have unlimited access to all features. No upgrade needed.`,
     testBroadcastStart: "🧪 <b>Starting Mock Broadcast...</b>\nEnsure you are subscribed to BTC/USDT, ETH/USDT, AAPL, or TSLA to receive alerts.",
     testBroadcastComplete: (count) => `✅ <b>Broadcast Complete</b>\nSent to: ${count} users.`,
     testBroadcastError: "❌ Error: NotificationService not found on MonitorService.",
+
+    // Position Tracker
+    positionHeader: `📊 <b>Purrrfect Position</b>\n\n`,
+    positionUpItem: (symbol, pnlStr, entryPrice, currentPrice) => `🟢 <b>${symbol}</b> (In Position)\n📈 Unrealized: <b>${pnlStr}</b>\n( ${entryPrice} ➔ ${currentPrice} )\n\n`,
+    positionDownItem: (symbol, pnlStr, entryPrice, exitPrice) => `🔴 <b>${symbol}</b> (Exited)\n📉 Prev PnL: <b>${pnlStr}</b>\n( ${entryPrice} ➔ ${exitPrice} )\n\n`,
+    positionEmpty: `<i>No position data available yet. Please wait for the next scan or subscribe to new assets.</i>`,
+    positionUnavailable: `⚠️ Position tracking is currently unavailable.`,
+    positionNoAssets: `You don't have any active assets tracked. Use /add to subscribe to assets.`,
+    positionError: `⚠️ An error occurred while fetching positions.`,
 
     // Backtest
     backtestLoading: (symbol, days) => `⏳ Running backtest for <b>${symbol}</b> over ${days} days...\nThis may take a moment.`,

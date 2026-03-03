@@ -121,6 +121,64 @@ class TechnicalService {
 
     return "HOLD";
   }
+
+  findLastCrossover(prices) {
+    const priceValues = prices
+      .filter((p) => {
+        if (p === null || p === undefined) return false;
+        if (typeof p === 'object' && p.close === null) return false;
+        return true;
+      })
+      .map((p) => {
+        const value = p.close || p;
+        return typeof value === "number" ? value : parseFloat(value);
+      });
+
+    if (priceValues.length < this.emaConfig.slowPeriod + 5) {
+      return { signal: "HOLD", daysAgo: -1, price: null };
+    }
+
+    const fastEMA = this.calculateEMA(priceValues, this.emaConfig.fastPeriod);
+    const slowEMA = this.calculateEMA(priceValues, this.emaConfig.slowPeriod);
+    const minLen = Math.min(fastEMA.length, slowEMA.length);
+    if (minLen < 2) return { signal: "HOLD", daysAgo: -1, price: null };
+
+    // Search backwards from the end
+    let latestCrossover = null;
+
+    for (let offset = 0; offset < minLen - 1; offset++) {
+        const currentFast = fastEMA[fastEMA.length - 1 - offset];
+        const previousFast = fastEMA[fastEMA.length - 2 - offset];
+        const currentSlow = slowEMA[slowEMA.length - 1 - offset];
+        const previousSlow = slowEMA[slowEMA.length - 2 - offset];
+        
+        if (previousFast <= previousSlow && currentFast > currentSlow) {
+            const cross = { signal: "BUY", daysAgo: offset, price: priceValues[priceValues.length - 1 - offset] };
+            if (!latestCrossover) {
+                latestCrossover = cross;
+                latestCrossover.previousSignal = null;
+                return latestCrossover;
+            } else if (latestCrossover.signal === "SELL") {
+                latestCrossover.previousSignal = cross;
+                return latestCrossover;
+            }
+        }
+        
+        if (previousFast >= previousSlow && currentFast < currentSlow) {
+            const cross = { signal: "SELL", daysAgo: offset, price: priceValues[priceValues.length - 1 - offset] };
+            if (!latestCrossover) {
+                latestCrossover = cross;
+                latestCrossover.previousSignal = null;
+            } else if (latestCrossover.signal === "BUY") {
+                latestCrossover.previousSignal = cross;
+                return latestCrossover;
+            }
+        }
+    }
+    
+    if (latestCrossover) return latestCrossover;
+    return { signal: "HOLD", daysAgo: -1, price: null, previousSignal: null };
+  }
 }
 
 module.exports = TechnicalService;

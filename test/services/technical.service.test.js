@@ -255,4 +255,55 @@ describe("TechnicalService", () => {
       expect(["SELL", "HOLD"]).to.include(result.signal); // Allow some flexibility due to noise
     });
   });
+
+  describe("findLastCrossover()", () => {
+    it("should find the last BUY crossover and its offset", () => {
+      const prices = [];
+      let basePrice = 100;
+      for (let i = 0; i < 60; i++) {
+        const oscillation = Math.sin(i * 0.1) * 2;
+        prices.push(basePrice + oscillation);
+      }
+      prices.push(95); 
+      prices.push(94); 
+      prices.push(110); // BUY occurs here (offset 2 from end)
+      prices.push(115); // HOLD (offset 1)
+      prices.push(120); // HOLD (offset 0)
+
+      const result = technicalService.findLastCrossover(prices);
+      
+      expect(result.signal).to.equal("BUY");
+      expect(result.daysAgo).to.equal(2);
+      expect(result.price).to.equal(110);
+    });
+
+    it("should find the last SELL crossover and its offset, along with previous BUY", () => {
+      const prices = [];
+      let basePrice = 100;
+      
+      // Initial sideways/down (Needs > 26 periods for Slow EMA to initialize properly)
+      for (let i = 0; i < 50; i++) prices.push(basePrice);
+      
+      // Spike up to trigger a BUY
+      for (let i = 0; i < 20; i++) prices.push(basePrice + 20);
+      
+      // Spike down to trigger a SELL
+      for (let i = 0; i < 10; i++) prices.push(basePrice - 20);
+
+      const result = technicalService.findLastCrossover(prices);
+      
+      expect(result.signal).to.equal("SELL");
+      expect(result.previousSignal).to.not.be.null;
+      expect(result.previousSignal.signal).to.equal("BUY");
+    });
+
+    it("should return HOLD if no crossover is found", () => {
+      const prices = [];
+      for (let i = 0; i < 50; i++) prices.push(100 + i * 0.5); // steady uptrend
+
+      const result = technicalService.findLastCrossover(prices);
+      expect(result.signal).to.equal("HOLD");
+      expect(result.daysAgo).to.equal(-1);
+    });
+  });
 });

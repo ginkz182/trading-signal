@@ -390,6 +390,73 @@ class SubscriberService {
     };
   }
 
+  // --- Asset State tracking ---
+
+  async getAssetState(symbol) {
+    await this.initialize();
+    const result = await this.pool.query(
+      `SELECT * FROM asset_states WHERE symbol = $1`,
+      [symbol]
+    );
+    return result.rows[0];
+  }
+
+  async getAssetStates(symbols) {
+    if (!symbols || symbols.length === 0) return [];
+    await this.initialize();
+    const placeholders = symbols.map((_, i) => `$${i + 1}`).join(',');
+    const result = await this.pool.query(
+      `SELECT * FROM asset_states WHERE symbol IN (${placeholders})`,
+      symbols
+    );
+    return result.rows;
+  }
+
+  async recordBuySignal(symbol, entryPrice, entryDate) {
+    await this.initialize();
+    const result = await this.pool.query(`
+      INSERT INTO asset_states (symbol, current_trend, entry_price, entry_date, exit_price, exit_date, realized_pnl_percentage, updated_at)
+      VALUES ($1, 'UPTREND', $2, $3, NULL, NULL, NULL, CURRENT_TIMESTAMP)
+      ON CONFLICT (symbol)
+      DO UPDATE SET
+        current_trend = 'UPTREND',
+        entry_price = EXCLUDED.entry_price,
+        entry_date = EXCLUDED.entry_date,
+        exit_price = NULL,
+        exit_date = NULL,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [symbol, entryPrice, entryDate]);
+    return result.rows[0];
+  }
+
+  async recordSellSignal(symbol, exitPrice, exitDate) {
+    await this.initialize();
+    
+    const oldState = await this.getAssetState(symbol);
+    let realizedPnl = null;
+    let entryPrice = oldState ? oldState.entry_price : null;
+    let entryDate = oldState ? oldState.entry_date : null;
+
+    if (entryPrice) {
+      realizedPnl = ((exitPrice - entryPrice) / entryPrice) * 100;
+    }
+
+    const result = await this.pool.query(`
+      INSERT INTO asset_states (symbol, current_trend, entry_price, entry_date, exit_price, exit_date, realized_pnl_percentage, updated_at)
+      VALUES ($1, 'DOWNTREND', $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+      ON CONFLICT (symbol)
+      DO UPDATE SET
+        current_trend = 'DOWNTREND',
+        exit_price = EXCLUDED.exit_price,
+        exit_date = EXCLUDED.exit_date,
+        realized_pnl_percentage = EXCLUDED.realized_pnl_percentage,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [symbol, entryPrice, entryDate, exitPrice, exitDate, realizedPnl]);
+    return result.rows[0];
+  }
+
   // --- Subscription Management Methods ---
 
   /**

@@ -409,7 +409,7 @@ describe("SubscriberService", () => {
         config.stockSymbols = ["AAPL"];
         
         const assets = await subscriberService.getActiveAssets("chat123", "free");
-        expect(assets).to.include.members(["BTC", "ETH", "AAPL"]);
+        expect(assets).to.have.members(["BTC", "ETH", "AAPL"]);
         expect(queryStub.called).to.be.false;
       });
 
@@ -429,10 +429,27 @@ describe("SubscriberService", () => {
         const assets = await subscriberService.getActiveAssets("chat123", "premium");
         
         expect(queryStub.calledOnce).to.be.true;
-        expect(assets).to.include("BTC");
-        expect(assets).to.include("AAPL");
-        expect(assets).to.include("TSLA");
-        expect(assets).to.not.include("ETH");
+        expect(assets).to.have.members(["BTC", "AAPL", "TSLA"]);
+      });
+
+      it("should return default list for downgraded premium user", async () => {
+        const config = require("../../src/config");
+        config.symbols = ["BTC", "ETH"];
+        config.stockSymbols = ["AAPL"];
+
+        // Simulate DB returning custom assets from past premium usage
+        queryStub.resolves({
+          rows: [
+            { symbol: "ETH", action: "removed", type: "crypto" },
+            { symbol: "TSLA", action: "added", type: "stock" }
+          ]
+        });
+
+        // Calling with "free" tier should bypass DB entirely
+        const assets = await subscriberService.getActiveAssets("chat123", "free");
+        
+        expect(queryStub.called).to.be.false;
+        expect(assets).to.have.members(["BTC", "ETH", "AAPL"]);
       });
     });
 
@@ -485,6 +502,44 @@ describe("SubscriberService", () => {
         expect(queryArg).to.include("'removed'");
         expect(queryStub.lastCall.args[1]).to.deep.equal(["chat123", "DOGE", "crypto"]);
       });
+    });
+  });
+
+  describe("Asset State Tracking (PnL)", () => {
+    beforeEach(async () => {
+      queryStub.resolves({ rows: [] });
+      await subscriberService.initialize();
+      queryStub.reset();
+    });
+
+    it("should record a BUY signal (UPTREND)", async () => {
+      queryStub.resolves({ rows: [{ symbol: "BTC", current_trend: "UPTREND", entry_price: 50000 }] });
+      
+      const result = await subscriberService.recordBuySignal("BTC", 50000, new Date());
+      
+      expect(queryStub.calledOnce).to.be.true;
+      const queryStr = queryStub.firstCall.args[0];
+      expect(queryStr).to.include("INSERT INTO asset_states");
+      expect(queryStr).to.include("'UPTREND'");
+      expect(result.current_trend).to.equal("UPTREND");
+    });
+
+    it("should record a SELL signal (DOWNTREND) and calculate PnL", async () => {
+      // First call is getAssetState
+      queryStub.onFirstCall().resolves({ rows: [{ symbol: "BTC", current_trend: "UPTREND", entry_price: 50000, entry_date: new Date() }] });
+      // Second call is UPSERT
+      queryStub.onSecondCall().resolves({ rows: [{ symbol: "BTC", current_trend: "DOWNTREND", exit_price: 55000, realized_pnl_percentage: 10 }] });
+      
+      const result = await subscriberService.recordSellSignal("BTC", 55000, new Date());
+      
+      expect(queryStub.callCount).to.equal(2);
+      const queryStr = queryStub.secondCall.args[0];
+      const queryParams = queryStub.secondCall.args[1];
+      
+      expect(queryStr).to.include("INSERT INTO asset_states");
+      expect(queryStr).to.include("'DOWNTREND'");
+      expect(queryParams[5]).to.equal(10); // PnL mathematically ((55000-50000)/50000)*100 = 10%
+      expect(result.realized_pnl_percentage).to.equal(10);
     });
   });
 
