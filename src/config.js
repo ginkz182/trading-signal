@@ -3,17 +3,15 @@ const config = {
     "BTC/USDT",
     "ETH/USDT",
     "SOL/USDT",
-    "AVAX/USDT",
     "LINK/USDT",
     "BNB/USDT",
-    "ARB/USDT",
-    "INJ/USDT",
     "ONDO/USDT",
-    "STX/USDT",
+    "SUI/USDT",
+    "NEAR/USDT",
   ],
   stockSymbols: [
     "NVDA",
-    "TSLA",
+    "MSFT",
     "BKNG",
     "META",
     "PLTR",
@@ -24,6 +22,7 @@ const config = {
     "CCJ",
     "RTX",
     "GEV",
+    "KTOS",
     "GC=F",
   ],
   timeframe: "1d",
@@ -61,19 +60,19 @@ const config = {
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     // Define price IDs for different tiers/recurrence
     prices: {
-        premium_monthly: process.env.STRIPE_PRICE_ID_PREMIUM,
+      premium_monthly: process.env.STRIPE_PRICE_ID_PREMIUM,
     },
     // Amount in smallest currency unit (e.g., Satang for THB) for one-time payments
     amounts: {
-        premium_monthly: 19900, // 199.00 THB
-    }
+      premium_monthly: 19900, // 199.00 THB
+    },
   },
   telegram: {
-      botUsername: process.env.TELEGRAM_BOT_USERNAME || 'pginkSignalTest_bot',
-      adminChatId: process.env.ADMIN_CHAT_ID
+    botUsername: process.env.TELEGRAM_BOT_USERNAME || "pginkSignalTest_bot",
+    adminChatId: process.env.ADMIN_CHAT_ID,
   },
   payment: {
-      starsPrice: 250, // Stars
+    starsPrice: 250, // Stars
   },
 };
 
