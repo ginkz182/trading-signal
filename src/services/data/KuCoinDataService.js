@@ -59,6 +59,24 @@ class KuCoinService {
         throw new Error("No data returned");
       }
 
+      // Strip today's incomplete candle only if it's actually today's UTC date.
+      // At 00:05 UTC the new day's candle may not exist yet, so the last candle
+      // could be yesterday's complete one — don't strip it in that case.
+      const lastCandle = ohlcv[ohlcv.length - 1];
+      const lastCandleDate = new Date(lastCandle[0]);
+      const now = new Date();
+      const isTodayCandle =
+        lastCandleDate.getUTCFullYear() === now.getUTCFullYear() &&
+        lastCandleDate.getUTCMonth() === now.getUTCMonth() &&
+        lastCandleDate.getUTCDate() === now.getUTCDate();
+
+      if (isTodayCandle) {
+        ohlcv.pop();
+        console.log(`[KUCOIN] ${symbol}: Stripped today's incomplete candle (${lastCandleDate.toISOString().slice(0, 10)})`);
+      } else {
+        console.log(`[KUCOIN] ${symbol}: Last candle is ${lastCandleDate.toISOString().slice(0, 10)} (complete, keeping it)`);
+      }
+
       // UPDATED: Increased limit for better EMA accuracy
       const closingPrices = ohlcv.map((candle) => candle[4]);
       const MEMORY_LIMIT = 300; // INCREASED from 150 to 300 for EMA26 accuracy

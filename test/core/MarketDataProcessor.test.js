@@ -83,11 +83,11 @@ describe("MarketDataProcessor", () => {
       expect(result.symbol).to.equal("BTC-USD");
       expect(result.marketType).to.equal("crypto");
       expect(result.originalLength).to.equal(300);
-      expect(result.processedLength).to.equal(299); // Crypto slices 300->299
+      expect(result.processedLength).to.equal(300); // Incomplete candle stripped at source (KuCoinDataService)
       expect(result.latestPrice).to.deep.equal({ close: 399 });
       expect(result.dataSource).to.equal("crypto_previous_close");
       expect(processor.stats.processedSymbols).to.equal(1);
-      expect(processor.stats.totalDataPoints).to.equal(299); // Crypto slices 300->299
+      expect(processor.stats.totalDataPoints).to.equal(300);
     });
 
     it("should reject insufficient data", () => {
@@ -137,7 +137,7 @@ describe("MarketDataProcessor", () => {
 
       expect(result).to.not.be.null;
       expect(result.originalLength).to.equal(400);
-      expect(result.processedLength).to.equal(299); // 400->300 (windowing) then 300->299 (crypto slice)
+      expect(result.processedLength).to.equal(300); // 400->300 (windowing); incomplete candle stripped at source
       expect(processor.stats.limitedSymbols).to.equal(1);
       expect(
         consoleLogStub.calledWith(
@@ -163,7 +163,7 @@ describe("MarketDataProcessor", () => {
       const result = processor.prepareForAnalysis(rawPrices, "stock", "AAPL");
 
       expect(result.dataSource).to.equal("stock_intraday_incomplete");
-      expect(result.processedLength).to.equal(299); // Stock also slices during trading hours
+      expect(result.processedLength).to.equal(299); // Stock slices during trading hours (incomplete current candle)
     });
 
     it("should apply stock market logic outside trading hours", () => {
@@ -293,9 +293,9 @@ describe("MarketDataProcessor", () => {
       expect(stats.processedSymbols).to.equal(3);
       expect(stats.rejectedSymbols).to.equal(1);
       expect(stats.limitedSymbols).to.equal(1); // ETH-USD will be limited from 400 to 300
-      // Correctly calculates: 299 + 299 + 0 = 598 (from prices.length)
-      expect(stats.totalDataPoints).to.equal(598); // 299 + 299 + 0
-      expect(stats.averageDataPointsPerSymbol).to.equal(199); // Math.round(598/3)
+      // Correctly calculates: 300 + 300 + 0 = 600 (from prices.length; no slice in crypto path)
+      expect(stats.totalDataPoints).to.equal(600); // 300 + 300 + 0
+      expect(stats.averageDataPointsPerSymbol).to.equal(200); // Math.round(600/3)
       expect(stats.limitingRate).to.equal(33); // Math.round(1/3 * 100)
       expect(stats.rejectionRate).to.equal(33); // Math.round(1/3 * 100)
     });
@@ -349,10 +349,12 @@ describe("MarketDataProcessor", () => {
 
       const result = processor._applyMarketTimingLogic(allPrices, "crypto");
 
+      // Crypto no longer slices here — incomplete candle is stripped at source (KuCoinDataService)
       expect(result.prices).to.deep.equal([
         { close: 100 },
         { close: 101 },
         { close: 102 },
+        { close: 103 },
       ]);
       expect(result.latestPrice).to.deep.equal({ close: 103 });
       expect(result.dataSource).to.equal("crypto_previous_close");

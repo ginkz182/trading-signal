@@ -86,9 +86,10 @@ class MarketDataProcessor {
    */
   _applyMarketTimingLogic(allPrices, marketType) {
     if (marketType === "crypto") {
-      // Crypto: Use previous day's complete data
+      // Crypto: Incomplete candle is already stripped at the data source (KuCoinDataService)
+      // based on date check, so use all prices as-is.
       return {
-        prices: allPrices.slice(0, -1),
+        prices: allPrices,
         latestPrice: allPrices[allPrices.length - 1],
         dataSource: "crypto_previous_close",
       };
